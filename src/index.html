@@ -42,6 +42,14 @@
             <span class="role-card-desc">Рабочая страница и управление классом</span>
           </button>
         </div>
+
+        <label class="role-gate-option">
+          <input id="auto-launch-toggle" type="checkbox" />
+          <span class="role-gate-option-text">
+            <strong>Запускать при включении компьютера</strong>
+            <span class="muted">ClassHub откроется автоматически после входа в Windows</span>
+          </span>
+        </label>
       </section>
 
       <section id="teacher-auth" class="card teacher-auth hidden">
@@ -282,7 +290,7 @@
                   <button id="btn-class-folder" class="btn" type="button">Выбрать папку</button>
                 </div>
 
-                <p class="hint">Отметьте программы по названию из меню «Пуск». Если ничего не выбрано — ученики увидят все локальные программы. Отсутствующие на ПК ученика будут показаны серым.</p>
+                <p class="hint">Отметьте программы по названию из меню «Пуск». Если ничего не выбрано — ученики увидят все локальные программы. Ниже можно добавить ссылки на сайты и файлы.</p>
 
                 <div class="class-apps-shell">
                   <input
@@ -294,6 +302,32 @@
                   />
                   <div id="class-apps-list" class="class-apps-list"></div>
                   <div id="class-apps-empty" class="class-apps-empty hidden muted">Приложения не найдены</div>
+                </div>
+
+                <div class="class-links-shell">
+                  <span class="label">Ссылки на рабочую панель</span>
+                  <p class="hint">Как ярлыки Windows: сайт (https://...) или путь к файлу или папке на компьютере ученика.</p>
+                  <div class="class-link-form">
+                    <input
+                      id="class-link-name"
+                      class="class-link-name"
+                      type="text"
+                      placeholder="Название"
+                      autocomplete="off"
+                      maxlength="80"
+                    />
+                    <input
+                      id="class-link-url"
+                      class="class-link-url"
+                      type="text"
+                      placeholder="https://... или C:\..."
+                      autocomplete="off"
+                      maxlength="2048"
+                    />
+                    <button id="btn-class-link-add" class="btn" type="button">Добавить</button>
+                  </div>
+                  <div id="class-links-list" class="class-links-list"></div>
+                  <div id="class-links-empty" class="class-links-empty muted">Ссылки не добавлены</div>
                 </div>
 
                 <div class="admin-editor-actions">

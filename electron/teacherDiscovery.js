@@ -85,6 +85,7 @@ function buildStudentClassCatalog(teacherPayloads, peers) {
         teacherHostname: teacher.hostname || peer?.hostname || teacher.ip,
         teacherIp: teacher.ip,
         visibleApps: classItem.visibleApps || [],
+        customLinks: classItem.customLinks || [],
         hasShareFolder: Boolean(classItem.hasShareFolder),
         shareFolder: classItem.shareFolder || null,
         isLive,
@@ -165,6 +166,7 @@ function buildTeacherApiPayload(state, appRole) {
       shareFolder: classItem.shareFolder ? path.basename(classItem.shareFolder) : null,
       hasShareFolder: Boolean(classItem.shareFolder),
       visibleApps: classItem.visibleApps || [],
+      customLinks: classItem.customLinks || [],
       isSharing: sharingClassId === classItem.id,
     })),
   };

@@ -67,6 +67,7 @@ class FileServer {
         classId: this.classMeta.classId,
         className: this.classMeta.className,
         visibleApps: this.classMeta.visibleApps || [],
+        customLinks: this.classMeta.customLinks || [],
       });
     });
 

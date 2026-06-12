@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld("classHub", {
   discoverTeacherClasses: () => ipcRenderer.invoke("discover-teacher-classes"),
   setAppRole: (role) => ipcRenderer.invoke("set-app-role", role),
   getDeviceSession: () => ipcRenderer.invoke("get-device-session"),
+  getAutoLaunch: () => ipcRenderer.invoke("get-auto-launch"),
+  setAutoLaunch: (enabled) => ipcRenderer.invoke("set-auto-launch", enabled),
   fetchTeacherClassConfig: (teacherIp) => ipcRenderer.invoke("fetch-teacher-class-config", teacherIp),
   startScreenShare: () => ipcRenderer.invoke("start-screen-share"),
   stopScreenShare: () => ipcRenderer.invoke("stop-screen-share"),

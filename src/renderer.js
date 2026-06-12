@@ -29,6 +29,10 @@ const classEditorFolder = document.getElementById("class-editor-folder");
 const classAppsList = document.getElementById("class-apps-list");
 const classAppsSearch = document.getElementById("class-apps-search");
 const classAppsEmpty = document.getElementById("class-apps-empty");
+const classLinkNameInput = document.getElementById("class-link-name");
+const classLinkUrlInput = document.getElementById("class-link-url");
+const classLinksList = document.getElementById("class-links-list");
+const classLinksEmpty = document.getElementById("class-links-empty");
 const sharingClassLabel = document.getElementById("sharing-class-label");
 const sourceLinkBox = document.getElementById("source-link-box");
 const sourceLinkInput = document.getElementById("source-link");
@@ -41,6 +45,7 @@ const chatInput = document.getElementById("chat-input");
 const chatForm = document.getElementById("chat-form");
 const appVersionEl = document.getElementById("app-version");
 const roleGate = document.getElementById("role-gate");
+const autoLaunchToggle = document.getElementById("auto-launch-toggle");
 const teacherAuth = document.getElementById("teacher-auth");
 const teacherPasswordInput = document.getElementById("teacher-password");
 const teacherAuthError = document.getElementById("teacher-auth-error");
@@ -83,6 +88,7 @@ let activeClassId = null;
 let editingClassId = null;
 let joinedClass = null;
 let studentVisibleApps = [];
+let studentCustomLinks = [];
 let discoveredClassCatalog = [];
 let teacherGateFormMode = "create";
 let teacherGateFormClassId = null;
@@ -257,17 +263,51 @@ function getWorkspaceClassContext(state) {
   return null;
 }
 
+function getWorkspaceCustomLinks() {
+  if (isStudentRole()) {
+    return studentCustomLinks || [];
+  }
+
+  if (isTeacherRole() && activeClassId) {
+    const classItem = classes.find((item) => item.id === activeClassId);
+    return classItem?.customLinks || [];
+  }
+
+  return [];
+}
+
+function buildLinksForDisplay(links, searchQuery) {
+  return (links || [])
+    .filter((link) => {
+      if (!searchQuery) {
+        return true;
+      }
+
+      const haystack = `${link.name} ${link.url}`.toLowerCase();
+      return haystack.includes(searchQuery);
+    })
+    .map((link) => ({
+      isLink: true,
+      id: link.id,
+      name: link.name,
+      url: link.url,
+      missing: false,
+    }));
+}
+
 function getAppsForDisplay() {
   const searchQuery = String(appsSearch?.value || "")
     .trim()
     .toLowerCase();
   const visibleApps = getWorkspaceVisibleApps();
+  const links = buildLinksForDisplay(getWorkspaceCustomLinks(), searchQuery);
 
   if (!visibleApps.length) {
-    return sortAppsForDisplay(filterApps(appsSearch?.value || "")).map((app) => ({
+    const apps = sortAppsForDisplay(filterApps(appsSearch?.value || "")).map((app) => ({
       ...app,
       missing: false,
     }));
+    return [...apps, ...links];
   }
 
   const result = [];
@@ -286,7 +326,7 @@ function getAppsForDisplay() {
     }
   }
 
-  return result;
+  return [...result, ...links];
 }
 
 function applyClassState(state) {
@@ -666,6 +706,7 @@ function applyClassConfigFromCatalog(classId, teacherIp) {
   }
 
   studentVisibleApps = entry.visibleApps || [];
+  studentCustomLinks = entry.customLinks || [];
   return true;
 }
 
@@ -756,6 +797,7 @@ async function joinSelectedClass({ classId, className, teacherIp }) {
 async function loadStudentClassConfig() {
   if (!joinedClass?.teacherIp) {
     studentVisibleApps = [];
+    studentCustomLinks = [];
     return;
   }
 
@@ -764,7 +806,13 @@ async function loadStudentClassConfig() {
   }
 
   const result = await window.classHub.fetchTeacherClassConfig(joinedClass.teacherIp);
-  studentVisibleApps = result.ok ? result.config?.visibleApps || [] : [];
+  if (result.ok) {
+    studentVisibleApps = result.config?.visibleApps || [];
+    studentCustomLinks = result.config?.customLinks || [];
+  } else {
+    studentVisibleApps = [];
+    studentCustomLinks = [];
+  }
 }
 
 function renderClassesUi(state) {
@@ -825,6 +873,96 @@ function updateClassEditorVisibility(showEditor) {
   classEditorPlaceholder?.classList.toggle("hidden", showEditor);
 }
 
+function createLocalLinkId() {
+  return `link-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+let classEditorLinks = [];
+
+function renderClassLinksEditor(links) {
+  classEditorLinks = (links || []).map((link) => ({
+    id: link.id || createLocalLinkId(),
+    name: link.name,
+    url: link.url,
+  }));
+
+  if (!classLinksList) {
+    return;
+  }
+
+  if (!classEditorLinks.length) {
+    classLinksList.innerHTML = "";
+    classLinksEmpty?.classList.remove("hidden");
+    return;
+  }
+
+  classLinksEmpty?.classList.add("hidden");
+  classLinksList.innerHTML = classEditorLinks
+    .map(
+      (link, index) => `
+        <div class="class-link-item">
+          <div class="class-link-item-body">
+            <strong>${escapeHtml(link.name)}</strong>
+            <span class="muted class-link-item-url">${escapeHtml(link.url)}</span>
+          </div>
+          <button class="btn class-link-remove-btn" data-link-index="${index}" type="button">Удалить</button>
+        </div>
+      `
+    )
+    .join("");
+
+  classLinksList.querySelectorAll(".class-link-remove-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      const index = Number(button.dataset.linkIndex);
+      if (Number.isNaN(index)) {
+        return;
+      }
+
+      classEditorLinks.splice(index, 1);
+      renderClassLinksEditor(classEditorLinks);
+    });
+  });
+}
+
+function getClassEditorLinks() {
+  return classEditorLinks.map((link) => ({
+    id: link.id,
+    name: link.name,
+    url: link.url,
+  }));
+}
+
+function addClassEditorLink() {
+  const name = classLinkNameInput?.value.trim();
+  const url = classLinkUrlInput?.value.trim();
+
+  if (!name || !url) {
+    setStatus("Укажите название и адрес ссылки.");
+    return;
+  }
+
+  if (classEditorLinks.length >= 32) {
+    setStatus("Доступно не более 32 ссылок на класс.");
+    return;
+  }
+
+  classEditorLinks.push({
+    id: createLocalLinkId(),
+    name,
+    url,
+  });
+
+  if (classLinkNameInput) {
+    classLinkNameInput.value = "";
+  }
+  if (classLinkUrlInput) {
+    classLinkUrlInput.value = "";
+  }
+
+  renderClassLinksEditor(classEditorLinks);
+  classLinkNameInput?.focus();
+}
+
 async function renderClassEditor() {
   if (!classEditor) {
     return;
@@ -855,6 +993,13 @@ async function renderClassEditor() {
     classAppsSearch,
     classAppsEmpty
   );
+  if (classLinkNameInput) {
+    classLinkNameInput.value = "";
+  }
+  if (classLinkUrlInput) {
+    classLinkUrlInput.value = "";
+  }
+  renderClassLinksEditor(isNew ? [] : classItem.customLinks || []);
 }
 
 function getSelectedVisibleApps() {
@@ -902,6 +1047,20 @@ function updateAppTileIcon(appPath, iconSrc) {
 }
 
 function buildAppTileMarkup(app) {
+  if (app.isLink) {
+    const isWeb = /^https?:\/\//i.test(app.url);
+    return `
+      <div class="app-tile-wrap is-link" data-link-url="${escapeHtml(app.url)}">
+        <button class="app-tile app-tile-link" type="button" title="${escapeHtml(app.url)}">
+          <div class="app-icon-slot">
+            <span class="app-icon-fallback app-link-icon">${isWeb ? "🔗" : "📁"}</span>
+          </div>
+          <span class="app-name">${escapeHtml(app.name)}</span>
+        </button>
+      </div>
+    `;
+  }
+
   if (app.missing) {
     return `
       <div class="app-tile-wrap is-missing" data-app-name="${escapeHtml(app.name)}">
@@ -950,15 +1109,31 @@ function renderAppsGrid(apps) {
 
   if (!apps.length) {
     const visibleApps = getWorkspaceVisibleApps();
-    appsGrid.innerHTML = visibleApps.length
-      ? '<div class="apps-empty muted">Нет программ по фильтру.</div>'
+    const customLinks = getWorkspaceCustomLinks();
+    appsGrid.innerHTML = visibleApps.length || customLinks.length
+      ? '<div class="apps-empty muted">Нет программ и ссылок по фильтру.</div>'
       : '<div class="apps-empty muted">Программы не найдены.</div>';
     return;
   }
 
   appsGrid.innerHTML = apps.map((app) => buildAppTileMarkup(app)).join("");
 
-  appsGrid.querySelectorAll(".app-tile:not(.app-tile-missing)").forEach((button) => {
+  appsGrid.querySelectorAll(".app-tile-link").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const wrap = button.closest(".app-tile-wrap");
+      const url = wrap?.dataset.linkUrl;
+      if (!url) {
+        return;
+      }
+
+      const result = await window.classHub.openUrl(url);
+      if (result && !result.ok) {
+        setStatus(result.message || "Не удалось открыть ссылку.");
+      }
+    });
+  });
+
+  appsGrid.querySelectorAll(".app-tile:not(.app-tile-missing):not(.app-tile-link)").forEach((button) => {
     button.addEventListener("click", async () => {
       const result = await window.classHub.launchApp(button.dataset.appPath);
       if (!result.ok) {
@@ -1187,6 +1362,7 @@ function showRoleGate() {
     selectedSourceUrl = null;
     joinedClass = null;
     studentVisibleApps = [];
+    studentCustomLinks = [];
     discoveredClassCatalog = [];
     document.body.dataset.role = "";
     window.classHub.setAppRole(null);
@@ -1201,6 +1377,7 @@ function showRoleGate() {
       teacherPasswordInput.value = "";
     }
     hideTeacherAuthError();
+    initAutoLaunchToggle();
   });
 }
 
@@ -1674,6 +1851,16 @@ async function runServiceAction(action, options = {}) {
   return state;
 }
 
+async function initAutoLaunchToggle() {
+  if (!autoLaunchToggle) {
+    return;
+  }
+
+  const result = await window.classHub.getAutoLaunch();
+  autoLaunchToggle.checked = Boolean(result.enabled);
+  autoLaunchToggle.disabled = result.supported === false;
+}
+
 async function loadLocalInfo() {
   const state = await window.classHub.getState();
   const version = await window.classHub.getAppVersion();
@@ -1694,6 +1881,8 @@ async function loadLocalInfo() {
   } else {
     localNetworks.textContent = "";
   }
+
+  await initAutoLaunchToggle();
 }
 
 async function loadAppState() {
@@ -1836,6 +2025,19 @@ document.getElementById("btn-role-student")?.addEventListener("click", () => {
   enterStudentMode();
 });
 
+autoLaunchToggle?.addEventListener("change", async () => {
+  const enabled = autoLaunchToggle.checked;
+  const result = await window.classHub.setAutoLaunch(enabled);
+
+  if (!result.ok) {
+    autoLaunchToggle.checked = !enabled;
+    window.alert(result.message || "Не удалось изменить настройку автозапуска.");
+    return;
+  }
+
+  autoLaunchToggle.checked = Boolean(result.enabled);
+});
+
 document.getElementById("btn-role-teacher")?.addEventListener("click", () => {
   showTeacherAuth();
 });
@@ -1883,6 +2085,7 @@ document.getElementById("btn-switch-class")?.addEventListener("click", async () 
     await window.classHub.leaveClass();
     joinedClass = null;
     studentVisibleApps = [];
+    studentCustomLinks = [];
     discoveredClassCatalog = [];
     showStudentClassGate();
     return;
@@ -1990,6 +2193,17 @@ document.getElementById("btn-class-folder")?.addEventListener("click", async () 
   }
 });
 
+document.getElementById("btn-class-link-add")?.addEventListener("click", () => {
+  addClassEditorLink();
+});
+
+classLinkUrlInput?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    addClassEditorLink();
+  }
+});
+
 document.getElementById("btn-class-save")?.addEventListener("click", async () => {
   if (!editingClassId) {
     return;
@@ -2003,12 +2217,14 @@ document.getElementById("btn-class-save")?.addEventListener("click", async () =>
   }
 
   const visibleApps = getSelectedVisibleApps();
+  const customLinks = getClassEditorLinks();
 
   if (editingClassId === NEW_CLASS_ID) {
     const result = await window.classHub.createClass({
       name,
       shareFolder: classFormDraftFolder,
       visibleApps,
+      customLinks,
     });
 
     if (!result.ok) {
@@ -2029,6 +2245,7 @@ document.getElementById("btn-class-save")?.addEventListener("click", async () =>
   const result = await window.classHub.updateClass(editingClassId, {
     name,
     visibleApps,
+    customLinks,
   });
 
   if (!result.ok) {

@@ -3,7 +3,8 @@ const path = require("path");
 const crypto = require("crypto");
 const { app } = require("electron");
 const { readFolderState, folderExists } = require("./settings");
-const { MAX_CLASSES, MAX_VISIBLE_APPS_PER_CLASS } = require("./constants");
+const { MAX_CLASSES, MAX_VISIBLE_APPS_PER_CLASS, MAX_CUSTOM_LINKS_PER_CLASS } = require("./constants");
+const { normalizeLinkInput } = require("./linkUtils");
 
 function getClassesPath() {
   return path.join(app.getPath("userData"), "classes.json");
@@ -62,6 +63,37 @@ function normalizeVisibleApps(visibleApps) {
   return unique.slice(0, MAX_VISIBLE_APPS_PER_CLASS);
 }
 
+function normalizeCustomLinks(customLinks) {
+  if (!Array.isArray(customLinks)) {
+    return [];
+  }
+
+  const unique = [];
+  const seen = new Set();
+
+  for (const item of customLinks) {
+    const name = String(item?.name || "").trim().slice(0, 80);
+    const normalizedUrl = normalizeLinkInput(item?.url);
+    if (!name || !normalizedUrl.ok) {
+      continue;
+    }
+
+    const key = normalizedUrl.url.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    unique.push({
+      id: item?.id ? String(item.id) : crypto.randomUUID(),
+      name,
+      url: normalizedUrl.url,
+    });
+  }
+
+  return unique.slice(0, MAX_CUSTOM_LINKS_PER_CLASS);
+}
+
 function normalizeClass(item) {
   if (!item || !item.id || !item.name) {
     return null;
@@ -72,6 +104,7 @@ function normalizeClass(item) {
     name: String(item.name).trim().slice(0, 80),
     shareFolder: item.shareFolder && folderExists(item.shareFolder) ? path.resolve(item.shareFolder) : null,
     visibleApps: normalizeVisibleApps(item.visibleApps),
+    customLinks: normalizeCustomLinks(item.customLinks),
     createdAt: Number(item.createdAt) || Date.now(),
     updatedAt: Number(item.updatedAt) || Date.now(),
   };
@@ -128,6 +161,7 @@ function migrateFromLegacy(state) {
     name: "Мой класс",
     shareFolder: folderState.lastSelectedFolder,
     visibleApps: [],
+    customLinks: [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
@@ -187,7 +221,7 @@ function setSharingClass(classId) {
   return { ok: true, sharingClass: classId ? getClassById(classId) : null };
 }
 
-function createClass({ name, shareFolder, visibleApps }) {
+function createClass({ name, shareFolder, visibleApps, customLinks }) {
   const trimmedName = String(name || "").trim();
   if (!trimmedName) {
     return { ok: false, message: "Укажите название класса." };
@@ -203,6 +237,7 @@ function createClass({ name, shareFolder, visibleApps }) {
     name: trimmedName,
     shareFolder: shareFolder && folderExists(shareFolder) ? path.resolve(shareFolder) : null,
     visibleApps: normalizeVisibleApps(visibleApps),
+    customLinks: normalizeCustomLinks(customLinks),
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
@@ -234,6 +269,7 @@ function updateClass(classId, patch) {
           : null
         : current.shareFolder,
     visibleApps: patch.visibleApps !== undefined ? normalizeVisibleApps(patch.visibleApps) : current.visibleApps,
+    customLinks: patch.customLinks !== undefined ? normalizeCustomLinks(patch.customLinks) : current.customLinks,
     updatedAt: Date.now(),
   };
 

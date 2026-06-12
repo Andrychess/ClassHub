@@ -1444,6 +1444,49 @@ body[data-role="teacher"] .student-only {
   line-height: 1.45;
 }
 
+.role-gate-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--card-border);
+  background: #10141d;
+  cursor: pointer;
+  user-select: none;
+}
+
+.role-gate-option input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.role-gate-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.role-gate-option-text strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.role-gate-option-text .muted {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.role-gate-option:has(input:disabled) {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .teacher-auth-form {
   margin-top: 16px;
 }
@@ -1729,6 +1772,91 @@ body[data-role="teacher"] .student-only {
   border-radius: 10px;
   background: #10141d;
   font-size: 13px;
+}
+
+.app-tile-wrap.is-link .app-tile {
+  border-color: rgba(96, 165, 250, 0.35);
+}
+
+.app-tile-link:hover {
+  border-color: rgba(96, 165, 250, 0.65);
+}
+
+.app-link-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.class-links-shell {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.class-link-form {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(180px, 2fr) auto;
+  gap: 8px;
+}
+
+.class-link-name,
+.class-link-url {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: #10141d;
+  color: var(--text);
+  font: inherit;
+}
+
+.class-link-name:focus,
+.class-link-url:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.class-links-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.class-link-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: #10141d;
+}
+
+.class-link-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.class-link-item-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.class-links-empty {
+  padding: 16px 12px;
+  text-align: center;
+  border: 1px dashed var(--card-border);
+  border-radius: 10px;
+}
+
+.class-links-empty.hidden {
+  display: none;
 }
 
 .sharing-class-label {

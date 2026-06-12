@@ -17,6 +17,7 @@ module.exports = {
   MAX_PINNED_APPS: 16,
   MAX_CLASSES: 30,
   MAX_VISIBLE_APPS_PER_CLASS: 48,
+  MAX_CUSTOM_LINKS_PER_CLASS: 32,
   MAIN_WINDOW: {
     width: 1320,
     height: 860,

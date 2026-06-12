@@ -11,11 +11,13 @@ const {
   togglePinnedApp,
 } = require("../settings");
 const { normalizeHttpUrl } = require("../urls");
+const { openLinkTarget } = require("../linkUtils");
 const { checkForUpdates } = require("../updater");
 const { verifyTeacherPassword } = require("../teacherAuth");
 const { listInstalledApps, getAppIcon, getAppIconsBatch, launchInstalledApp } = require("../installedApps");
 const { fetchTeacherClassConfig } = require("../classConfig");
 const { readDeviceSession } = require("../deviceSession");
+const { getAutoLaunchSettings, setAutoLaunch } = require("../autoLaunch");
 const {
   readClassesState,
   getActiveClass,
@@ -142,6 +144,7 @@ function registerIpcHandlers(appContext) {
         classId: targetClass.id,
         className: targetClass.name,
         visibleApps: targetClass.visibleApps || [],
+        customLinks: targetClass.customLinks || [],
       };
       const result = await appContext.fileServer.start(folder, classMeta);
       addSavedFolder(folder);
@@ -231,11 +234,7 @@ function registerIpcHandlers(appContext) {
     appContext.sendStatus(message || "Ошибка захвата экрана");
   });
 
-  ipcMain.handle("open-url", async (_event, url) => {
-    if (url) {
-      await shell.openExternal(normalizeHttpUrl(url));
-    }
-  });
+  ipcMain.handle("open-url", async (_event, url) => openLinkTarget(url));
 
   ipcMain.handle("open-stream-viewer", (_event, url) => appContext.openStreamViewer(url));
 
@@ -345,6 +344,7 @@ function registerIpcHandlers(appContext) {
           classId: result.classItem.id,
           className: result.classItem.name,
           visibleApps: result.classItem.visibleApps || [],
+          customLinks: result.classItem.customLinks || [],
         });
       }
     }
@@ -397,6 +397,10 @@ function registerIpcHandlers(appContext) {
   });
 
   ipcMain.handle("get-device-session", () => readDeviceSession());
+
+  ipcMain.handle("get-auto-launch", () => getAutoLaunchSettings());
+
+  ipcMain.handle("set-auto-launch", (_event, enabled) => setAutoLaunch(Boolean(enabled)));
 
   ipcMain.handle("fetch-teacher-class-config", async (_event, teacherIp) => {
     const config = await fetchTeacherClassConfig(teacherIp);
