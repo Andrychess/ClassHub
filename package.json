@@ -1,6 +1,6 @@
 {
   "name": "classhub",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "ClassHub — локальная сеть учебной группы и раздача материалов",
   "main": "electron/main.js",
   "scripts": {
@@ -16,6 +16,7 @@
     "bump:major": "node ./scripts/bump-version.js major",
     "upload:github": "powershell -ExecutionPolicy Bypass -File ./scripts/upload-release.ps1",
     "release": "powershell -ExecutionPolicy Bypass -File ./scripts/release.ps1",
+    "release:continue": "powershell -ExecutionPolicy Bypass -File ./scripts/release.ps1 -SkipBump",
     "release:minor": "powershell -ExecutionPolicy Bypass -File ./scripts/release.ps1 -Bump minor",
     "release:major": "powershell -ExecutionPolicy Bypass -File ./scripts/release.ps1 -Bump major"
   },
