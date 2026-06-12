@@ -1,0 +1,174 @@
+const dgram = require("dgram");
+const {
+  PORT,
+  MSG_DISCOVER,
+  MSG_HELLO,
+  MSG_SOURCE,
+  MSG_SCREEN,
+  MSG_SCREEN_STOP,
+  getLocalIp,
+  getHostname,
+  isLocalIp,
+  parseMessage,
+  toHello,
+  toSource,
+  toScreen,
+  toStopSource,
+  toStopScreen,
+  toDiscover,
+  sendBroadcast,
+} = require("./protocol");
+
+class DiscoveryService {
+  constructor(onPeersChanged) {
+    this.onPeersChanged = onPeersChanged;
+    this.hostname = getHostname();
+    this.localIp = getLocalIp();
+    this.isSource = false;
+    this.httpPort = null;
+    this.isStreaming = false;
+    this.streamPort = null;
+    this.peers = new Map();
+    this.socket = null;
+    this.scanTimer = null;
+  }
+
+  start() {
+    this.socket = dgram.createSocket("udp4");
+    this.socket.on("error", () => {});
+
+    this.socket.on("message", (data, rinfo) => {
+      const { type, peer } = parseMessage(data);
+      if (!type) {
+        return;
+      }
+
+      if (type === MSG_DISCOVER) {
+        this.replyHello(rinfo.address);
+        return;
+      }
+
+      if (
+        (type === MSG_HELLO ||
+          type === MSG_SOURCE ||
+          type === MSG_SCREEN ||
+          type === MSG_SCREEN_STOP) &&
+        peer
+      ) {
+        if (isLocalIp(peer.ip)) {
+          return;
+        }
+        this.upsertPeer(peer, type);
+      }
+    });
+
+    this.socket.bind(PORT, () => {
+      this.upsertPeer(this.getSelfPeer(), MSG_HELLO);
+      this.scan();
+      this.scanTimer = setInterval(() => this.scan(), 5000);
+    });
+  }
+
+  stop() {
+    if (this.scanTimer) {
+      clearInterval(this.scanTimer);
+      this.scanTimer = null;
+    }
+    if (this.socket) {
+      this.socket.close();
+      this.socket = null;
+    }
+  }
+
+  getSelfPeer() {
+    return {
+      hostname: this.hostname,
+      ip: this.localIp,
+      isSource: this.isSource,
+      httpPort: this.httpPort,
+      isStreaming: this.isStreaming,
+      streamPort: this.streamPort,
+      isSelf: true,
+    };
+  }
+
+  scan() {
+    sendBroadcast(toDiscover());
+  }
+
+  announceSource(httpPort) {
+    this.isSource = true;
+    this.httpPort = httpPort;
+    this.upsertPeer(this.getSelfPeer(), MSG_SOURCE);
+    sendBroadcast(toSource({ hostname: this.hostname, ip: this.localIp, httpPort }));
+  }
+
+  announceStopSource() {
+    this.isSource = false;
+    this.httpPort = null;
+    this.upsertPeer(this.getSelfPeer(), MSG_HELLO);
+    sendBroadcast(toStopSource());
+  }
+
+  announceScreen(streamPort) {
+    this.isStreaming = true;
+    this.streamPort = streamPort;
+    this.upsertPeer(this.getSelfPeer(), MSG_SCREEN);
+    sendBroadcast(toScreen({ hostname: this.hostname, ip: this.localIp, streamPort }));
+  }
+
+  announceStopScreen() {
+    this.isStreaming = false;
+    this.streamPort = null;
+    this.upsertPeer(this.getSelfPeer(), MSG_SCREEN_STOP);
+    sendBroadcast(toStopScreen());
+  }
+
+  replyHello(targetIp) {
+    if (!this.socket) {
+      return;
+    }
+
+    const payload = toHello(this.getSelfPeer());
+    this.socket.send(Buffer.from(payload, "utf8"), PORT, targetIp, () => {});
+  }
+
+  upsertPeer(peer, messageType = MSG_HELLO) {
+    const key = peer.ip;
+    const existing = this.peers.get(key) || {};
+
+    if (messageType === MSG_SOURCE) {
+      peer = { ...existing, ...peer, isSource: true };
+    } else if (messageType === MSG_SCREEN) {
+      peer = { ...existing, ...peer, isStreaming: true };
+    } else if (messageType === MSG_SCREEN_STOP) {
+      peer = { ...existing, ...peer, isStreaming: false, streamPort: null };
+    } else if (messageType === MSG_HELLO) {
+      peer = {
+        ...existing,
+        ...peer,
+        isSource: peer.isSource ?? existing.isSource ?? false,
+        httpPort: peer.httpPort ?? existing.httpPort ?? null,
+        isStreaming: peer.isStreaming ?? existing.isStreaming ?? false,
+        streamPort: peer.streamPort ?? existing.streamPort ?? null,
+      };
+    }
+
+    if (existing.isSelf) {
+      peer = { ...peer, isSelf: true };
+    }
+
+    this.peers.set(key, peer);
+    this.onPeersChanged(this.getPeerList());
+  }
+
+  getPeerList() {
+    return Array.from(this.peers.values()).sort((a, b) => {
+      if (a.isSelf) return -1;
+      if (b.isSelf) return 1;
+      return a.hostname.localeCompare(b.hostname, "ru");
+    });
+  }
+}
+
+module.exports = { DiscoveryService };

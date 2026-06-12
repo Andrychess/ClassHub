@@ -1,0 +1,44 @@
+{
+  "name": "classhub",
+  "version": "1.0.0",
+  "description": "ClassHub — локальная сеть учебной группы и раздача материалов",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "author": "ClassHub",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "build": {
+    "appId": "ru.classhub.app",
+    "productName": "ClassHub",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.png"
+    },
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "src/assets/**/*",
+      "src/capture.html",
+      "src/capture.js",
+      "src/web/**/*",
+      "electron/deviceNames.js",
+      "electron/networkScan.js",
+      "assets/**/*",
+      "package.json"
+    ]
+  }
+}

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ClassHub — Материалы</title>
+    <link rel="icon" href="assets/favicon.png" type="image/png" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="topbar">
+        <div class="brand">
+          <img class="brand-icon" src="assets/logo.png" width="64" height="64" alt="ClassHub" />
+          <div>
+            <h1>ClassHub</h1>
+            <p class="subtitle">Материалы для занятий в учебной группе</p>
+          </div>
+        </div>
+        <div class="source-card">
+          <span class="label">Источник</span>
+          <strong id="source-name">—</strong>
+          <span id="source-host" class="muted">—</span>
+        </div>
+      </header>
+
+      <section class="panel toolbar">
+        <button id="btn-up" class="btn" title="На уровень выше">↑ Вверх</button>
+        <button id="btn-refresh" class="btn primary">Обновить</button>
+        <div class="search-wrap">
+          <input id="search" type="search" placeholder="Поиск по имени..." />
+        </div>
+        <span id="item-count" class="badge">0</span>
+      </section>
+
+      <nav id="breadcrumbs" class="panel breadcrumbs" aria-label="Путь"></nav>
+
+      <section class="panel files-panel">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Имя</th>
+                <th>Размер</th>
+                <th>Изменён</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="files-body">
+              <tr class="state-row">
+                <td colspan="4">Загрузка...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer class="footer muted">
+        Файлы раздаются внутри локальной сети класса — только для участников группы.
+      </footer>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

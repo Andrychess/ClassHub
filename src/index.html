@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data: http: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ClassHub</title>
+    <link rel="icon" href="assets/favicon.png" type="image/png" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="header">
+        <div class="brand-block">
+          <img class="brand-icon" src="assets/logo.png" width="64" height="64" alt="ClassHub" />
+          <div>
+            <h1>ClassHub</h1>
+            <p class="subtitle">Локальная сеть учебной группы и раздача материалов</p>
+          </div>
+        </div>
+        <div class="local-info">
+          <span class="label">Этот ПК</span>
+          <strong id="local-name">—</strong>
+          <span id="local-ip" class="muted">—</span>
+          <span id="local-networks" class="muted networks-list"></span>
+        </div>
+      </header>
+
+      <section class="toolbar card">
+        <button id="btn-scan" class="btn primary">Обновить список</button>
+        <button id="btn-open" class="btn">Открыть в браузере</button>
+        <span id="status" class="status">Загрузка...</span>
+      </section>
+
+      <section class="card peers-section">
+        <div class="section-title">
+          <h2>Устройства в сети</h2>
+          <span id="peer-count" class="badge">0</span>
+        </div>
+        <p class="hint">
+          Имена устройств запрашиваются по сети (DNS, NetBIOS, ping). Для ClassHub — имя компьютера Windows.
+          Телефоны часто показываются как «iPhone» или «Устройство IP».
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Имя ПК</th>
+                <th>IP-адрес</th>
+                <th>Роль</th>
+                <th>Экран</th>
+                <th>Ссылка</th>
+              </tr>
+            </thead>
+            <tbody id="peers-body">
+              <tr class="empty-row">
+                <td colspan="5">Поиск компьютеров...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card source-section">
+        <h2>ПК-источник</h2>
+        <p class="hint">Выберите папку с образом, софтом или скриптами и запустите раздачу.</p>
+
+        <div class="folder-row">
+          <select id="folder-select" class="folder-select">
+            <option value="">Выберите сохранённую папку...</option>
+          </select>
+          <button id="btn-folder" class="btn">Добавить...</button>
+          <button id="btn-remove-folder" class="btn danger-outline" title="Удалить из списка">✕</button>
+        </div>
+        <p id="folder-path" class="folder-path muted">Папка не выбрана</p>
+
+        <div class="actions">
+          <button id="btn-source" class="btn success">Стать источником</button>
+          <button id="btn-stop" class="btn danger">Остановить раздачу</button>
+        </div>
+
+        <div id="source-link-box" class="source-link-box hidden">
+          <span class="label">Ссылка для учеников</span>
+          <div class="source-link-row">
+            <input id="source-link" type="text" readonly />
+            <button id="btn-copy-link" class="btn primary">Копировать</button>
+            <button id="btn-open-source" class="btn">Открыть</button>
+          </div>
+          <p class="hint source-link-hint">
+            Важно: только <strong>http://</strong>, не https. Порт <strong>:8765</strong> обязателен.
+            Если видите ERR_SSL_PROTOCOL_ERROR — в адресе случайно https или нет порта.
+          </p>
+        </div>
+      </section>
+
+      <section class="card stream-client-section">
+        <h2>Трансляция экрана</h2>
+        <p class="hint">Ученик может показать свой экран учителю на ПК-источнике.</p>
+        <div class="actions">
+          <button id="btn-screen-start" class="btn primary">Показать экран учителю</button>
+          <button id="btn-screen-stop" class="btn danger">Остановить показ</button>
+        </div>
+      </section>
+
+      <section class="card screens-section">
+        <div class="section-title">
+          <h2>Экраны класса</h2>
+          <span id="screen-count" class="badge">0</span>
+        </div>
+        <p class="hint">Здесь отображаются экраны учеников, которые включили трансляцию.</p>
+        <div id="screen-grid" class="screen-grid">
+          <div class="screen-empty muted">Пока никто не транслирует экран</div>
+        </div>
+      </section>
+    </div>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>
