@@ -100,7 +100,10 @@
 
       <section class="card stream-client-section">
         <h2>Трансляция экрана</h2>
-        <p class="hint">Ученик может показать свой экран учителю на ПК-источнике.</p>
+        <p class="hint">
+          Ученик нажимает «Показать экран учителю». Учитель видит экран в блоке «Экраны класса» ниже.
+          Если экран не появился — нажмите «Обновить список» на обоих ПК. Нужен порт <strong>8766</strong> в брандмауэре.
+        </p>
         <div class="actions">
           <button id="btn-screen-start" class="btn primary">Показать экран учителю</button>
           <button id="btn-screen-stop" class="btn danger">Остановить показ</button>
@@ -112,7 +115,10 @@
           <h2>Экраны класса</h2>
           <span id="screen-count" class="badge">0</span>
         </div>
-        <p class="hint">Здесь отображаются экраны учеников, которые включили трансляцию.</p>
+        <p class="hint">
+          Здесь отображаются экраны учеников, которые включили трансляцию.
+          Для проверки откройте в браузере: <strong>http://IP_ученика:8766/stream</strong>
+        </p>
         <div id="screen-grid" class="screen-grid">
           <div class="screen-empty muted">Пока никто не транслирует экран</div>
         </div>

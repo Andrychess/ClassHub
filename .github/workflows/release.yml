@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -26,7 +28,32 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build installer and publish GitHub Release
-        run: npm run dist:publish
+      - name: Build installer
+        run: npx electron-builder --win --publish never --config.directories.output=build-output
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Find installer
+        id: artifact
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path build-output -Recurse -Filter "ClassHub Setup *.exe" |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          if (-not $exe) {
+            throw "Installer not found in build-output"
+          }
+          "path=$($exe.FullName)" >> $env:GITHUB_OUTPUT
+          Write-Host "Installer: $($exe.FullName)"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ steps.artifact.outputs.path }}
+            build-output/**/*.blockmap
+            build-output/**/latest.yml
+          generate_release_notes: true
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

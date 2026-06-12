@@ -8,6 +8,7 @@ const {
   SUBNET_HOST_END,
 } = require("./constants");
 const { sortPeers } = require("./peers");
+const { enrichDevicesWithNetworkServices } = require("./sourceProbe");
 
 function pingHost(ip) {
   return new Promise((resolve) => {
@@ -99,7 +100,7 @@ async function scanLocalNetwork(options = {}) {
   const confirmedIps = Array.from(aliveSet).filter((ip) => isConfirmedDevice(ip, arp.get(ip)));
   const resolvedNames = await resolveDeviceNames(confirmedIps);
 
-  return confirmedIps.map((ip) => {
+  const devices = confirmedIps.map((ip) => {
     const arpEntry = arp.get(ip);
     const resolvedName = resolvedNames.get(ip);
     return {
@@ -114,6 +115,8 @@ async function scanLocalNetwork(options = {}) {
       isNetworkDevice: true,
     };
   });
+
+  return enrichDevicesWithNetworkServices(devices);
 }
 
 function guessDeviceName(ip, arpHost) {
@@ -135,7 +138,17 @@ function mergePeerLists(classHubPeers, networkDevices) {
   }
 
   for (const device of networkDevices) {
-    if (merged.has(device.ip)) {
+    const existing = merged.get(device.ip);
+    if (existing) {
+      merged.set(device.ip, {
+        ...existing,
+        hasClassHub: existing.hasClassHub || device.hasClassHub,
+        hostname: existing.hostname || device.hostname,
+        isSource: existing.isSource || device.isSource,
+        httpPort: existing.httpPort || device.httpPort,
+        isStreaming: existing.isStreaming || device.isStreaming,
+        streamPort: existing.streamPort || device.streamPort,
+      });
       continue;
     }
     merged.set(device.ip, device);

@@ -3,6 +3,7 @@ const { SCREEN_SERVER_PORT } = require("./constants");
 const { buildLocalStreamUrl } = require("./urls");
 const { tryAddScreenFirewallRule } = require("./firewall");
 const { listenOn, closeServer } = require("./serverUtils");
+const { getLocalIp, getHostname } = require("./protocol");
 
 const BOUNDARY = "classhub-frame";
 
@@ -50,6 +51,16 @@ class ScreenServer {
     }
 
     const app = express();
+
+    app.get("/status", (_req, res) => {
+      res.json({
+        streaming: true,
+        hostname: getHostname(),
+        ip: getLocalIp(),
+        port: this.port,
+      });
+    });
+
     app.get("/stream", (req, res) => {
       res.writeHead(200, {
         "Content-Type": `multipart/x-mixed-replace; boundary=${BOUNDARY}`,

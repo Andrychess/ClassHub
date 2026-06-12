@@ -95,16 +95,35 @@ function renderScreenGrid(list) {
           <div class="screen-card-head">
             <strong>${escapeHtml(peer.hostname)}</strong>
             <span class="muted">${escapeHtml(peer.ip)}</span>
+            <button class="btn linkish screen-open-btn" data-stream-url="${escapeHtml(streamUrl)}" type="button">
+              Открыть в браузере
+            </button>
           </div>
           <img
             class="screen-preview"
             src="${escapeHtml(streamUrl)}"
             alt="Экран ${escapeHtml(peer.hostname)}"
           />
+          <p class="screen-fallback muted hidden">
+            Поток не загрузился. Откройте ссылку в браузере или проверьте брандмауэр (порт 8766).
+          </p>
         </article>
       `;
     })
     .join("");
+
+  screenGrid.querySelectorAll(".screen-open-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      window.classHub.openUrl(button.dataset.streamUrl);
+    });
+  });
+
+  screenGrid.querySelectorAll(".screen-preview").forEach((image) => {
+    image.addEventListener("error", () => {
+      image.classList.add("hidden");
+      image.parentElement.querySelector(".screen-fallback")?.classList.remove("hidden");
+    });
+  });
 }
 
 function folderLabel(folder) {

@@ -246,6 +246,10 @@ tbody tr.empty-row:hover {
   display: none;
 }
 
+.hidden {
+  display: none !important;
+}
+
 .source-link-box .label {
   display: block;
   font-size: 12px;
@@ -352,11 +356,18 @@ tbody tr.empty-row:hover {
 
 .screen-card-head {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
+  flex-wrap: wrap;
   padding: 10px 12px;
   border-bottom: 1px solid var(--card-border);
   font-size: 14px;
+}
+
+.screen-fallback {
+  padding: 10px 12px;
+  font-size: 13px;
 }
 
 .screen-preview {

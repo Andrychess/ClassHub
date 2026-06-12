@@ -10,6 +10,7 @@
     "predist": "powershell -ExecutionPolicy Bypass -File ./scripts/pre-dist.ps1",
     "dist": "node ./scripts/run-dist.js",
     "dist:publish": "node ./scripts/run-dist.js -- --win --publish always",
+    "upload:github": "powershell -ExecutionPolicy Bypass -File ./scripts/upload-release.ps1",
     "release:patch": "npm version patch -m \"Release %s\"",
     "release:minor": "npm version minor -m \"Release %s\"",
     "release:major": "npm version major -m \"Release %s\""

@@ -1,5 +1,5 @@
 const dgram = require("dgram");
-const { DISCOVERY_SCAN_INTERVAL_MS } = require("./constants");
+const { DISCOVERY_SCAN_INTERVAL_MS, SOURCE_ANNOUNCE_INTERVAL_MS } = require("./constants");
 const { sortPeers } = require("./peers");
 const {
   PORT,
@@ -33,6 +33,13 @@ class DiscoveryService {
     this.peers = new Map();
     this.socket = null;
     this.scanTimer = null;
+    this.sourceAnnounceTimer = null;
+    this.screenAnnounceTimer = null;
+  }
+
+  refreshNetworkIdentity() {
+    this.hostname = getHostname();
+    this.localIp = getLocalIp();
   }
 
   start() {
@@ -72,6 +79,8 @@ class DiscoveryService {
   }
 
   stop() {
+    this.stopSourceAnnounceTimer();
+    this.stopScreenAnnounceTimer();
     if (this.scanTimer) {
       clearInterval(this.scanTimer);
       this.scanTimer = null;
@@ -99,13 +108,45 @@ class DiscoveryService {
   }
 
   announceSource(httpPort) {
+    this.refreshNetworkIdentity();
     this.isSource = true;
     this.httpPort = httpPort;
     this.upsertPeer(this.getSelfPeer(), MSG_SOURCE);
-    sendBroadcast(toSource({ hostname: this.hostname, ip: this.localIp, httpPort }));
+    this.broadcastSource(httpPort);
+    this.startSourceAnnounceTimer(httpPort);
+  }
+
+  broadcastSource(httpPort) {
+    sendBroadcast(
+      toSource({
+        hostname: this.hostname,
+        ip: this.localIp,
+        httpPort: httpPort || this.httpPort,
+      })
+    );
+  }
+
+  startSourceAnnounceTimer(httpPort) {
+    this.stopSourceAnnounceTimer();
+    this.sourceAnnounceTimer = setInterval(() => {
+      if (!this.isSource) {
+        return;
+      }
+      this.refreshNetworkIdentity();
+      this.upsertPeer(this.getSelfPeer(), MSG_SOURCE);
+      this.broadcastSource(httpPort || this.httpPort);
+    }, SOURCE_ANNOUNCE_INTERVAL_MS);
+  }
+
+  stopSourceAnnounceTimer() {
+    if (this.sourceAnnounceTimer) {
+      clearInterval(this.sourceAnnounceTimer);
+      this.sourceAnnounceTimer = null;
+    }
   }
 
   announceStopSource() {
+    this.stopSourceAnnounceTimer();
     this.isSource = false;
     this.httpPort = null;
     this.upsertPeer(this.getSelfPeer(), MSG_HELLO);
@@ -113,13 +154,45 @@ class DiscoveryService {
   }
 
   announceScreen(streamPort) {
+    this.refreshNetworkIdentity();
     this.isStreaming = true;
     this.streamPort = streamPort;
     this.upsertPeer(this.getSelfPeer(), MSG_SCREEN);
-    sendBroadcast(toScreen({ hostname: this.hostname, ip: this.localIp, streamPort }));
+    this.broadcastScreen(streamPort);
+    this.startScreenAnnounceTimer(streamPort);
+  }
+
+  broadcastScreen(streamPort) {
+    sendBroadcast(
+      toScreen({
+        hostname: this.hostname,
+        ip: this.localIp,
+        streamPort: streamPort || this.streamPort,
+      })
+    );
+  }
+
+  startScreenAnnounceTimer(streamPort) {
+    this.stopScreenAnnounceTimer();
+    this.screenAnnounceTimer = setInterval(() => {
+      if (!this.isStreaming) {
+        return;
+      }
+      this.refreshNetworkIdentity();
+      this.upsertPeer(this.getSelfPeer(), MSG_SCREEN);
+      this.broadcastScreen(streamPort || this.streamPort);
+    }, SOURCE_ANNOUNCE_INTERVAL_MS);
+  }
+
+  stopScreenAnnounceTimer() {
+    if (this.screenAnnounceTimer) {
+      clearInterval(this.screenAnnounceTimer);
+      this.screenAnnounceTimer = null;
+    }
   }
 
   announceStopScreen() {
+    this.stopScreenAnnounceTimer();
     this.isStreaming = false;
     this.streamPort = null;
     this.upsertPeer(this.getSelfPeer(), MSG_SCREEN_STOP);
@@ -131,6 +204,7 @@ class DiscoveryService {
       return;
     }
 
+    this.refreshNetworkIdentity();
     const payload = toHello(this.getSelfPeer());
     this.socket.send(Buffer.from(payload, "utf8"), PORT, targetIp, () => {});
   }
