@@ -8,6 +8,7 @@ const { tryAddHttpFirewallRule } = require("./firewall");
 const { listenOn, closeServer } = require("./serverUtils");
 
 const WEB_ROOT = path.join(__dirname, "../src/web");
+const SHARED_ROOT = path.join(__dirname, "../src/shared");
 
 class FileServer {
   constructor() {
@@ -97,6 +98,7 @@ class FileServer {
       });
     });
 
+    app.use("/shared", express.static(SHARED_ROOT));
     app.use(express.static(WEB_ROOT, { index: "index.html" }));
 
     app.get("*", (_req, res) => {

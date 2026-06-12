@@ -55,7 +55,7 @@ function renderPeers(list) {
           : '<span class="role-client">—</span>';
       const url =
         peer.isSource && peer.httpPort
-          ? `<span class="url-link">http://${escapeHtml(peer.ip)}:${peer.httpPort}/</span>`
+          ? `<span class="url-link">${escapeHtml(buildSourceUrl(peer.ip, peer.httpPort))}</span>`
           : "—";
 
       return `
@@ -89,7 +89,7 @@ function renderScreenGrid(list) {
 
   screenGrid.innerHTML = streaming
     .map((peer) => {
-      const streamUrl = `http://${peer.ip}:${peer.streamPort}/stream`;
+      const streamUrl = buildStreamUrl(peer.ip, peer.streamPort);
       return `
         <article class="screen-card">
           <div class="screen-card-head">
@@ -105,14 +105,6 @@ function renderScreenGrid(list) {
       `;
     })
     .join("");
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
 }
 
 function folderLabel(folder) {
@@ -155,6 +147,14 @@ function buildStatusMessage(state) {
   return "Поиск компьютеров в сети...";
 }
 
+function formatStatusWithFirewall(state, firewall) {
+  const message = buildStatusMessage(state);
+  if (firewall && !firewall.ok) {
+    return `${message} | ${firewall.message}`;
+  }
+  return message;
+}
+
 function updateSourceLinkBox(sourceUrl, isSource) {
   activeSourceUrl = isSource && sourceUrl ? sourceUrl : null;
   if (!sourceLinkBox || !sourceLinkInput) {
@@ -168,6 +168,30 @@ function updateSourceLinkBox(sourceUrl, isSource) {
     sourceLinkBox.classList.add("hidden");
     sourceLinkInput.value = "";
   }
+}
+
+async function refreshState(options = {}) {
+  const state = await window.classHub.getState();
+  if (options.updateFolders !== false) {
+    applyFolderState(state.shareFolder, state.savedFolders);
+  }
+  if (options.updatePeers !== false) {
+    renderPeers(state.peers);
+  }
+  setStatus(buildStatusMessage(state));
+  return state;
+}
+
+async function runServiceAction(action, options = {}) {
+  const result = await action();
+  if (!result.ok) {
+    setStatus(result.message);
+    return null;
+  }
+
+  const state = await refreshState(options);
+  setStatus(formatStatusWithFirewall(state, result.firewall));
+  return state;
 }
 
 async function loadState() {
@@ -246,49 +270,22 @@ document.getElementById("btn-remove-folder").addEventListener("click", async () 
   setStatus("Папка удалена из списка.");
 });
 
-document.getElementById("btn-source").addEventListener("click", async () => {
-  const result = await window.classHub.startSource(shareFolder);
-  if (!result.ok) {
-    setStatus(result.message);
-    return;
-  }
-
-  const state = await window.classHub.getState();
-  applyFolderState(state.shareFolder, state.savedFolders);
-  setStatus(buildStatusMessage(state));
-
-  if (result.firewall && !result.firewall.ok) {
-    setStatus(`${buildStatusMessage(state)} | ${result.firewall.message}`);
-  }
-});
+document.getElementById("btn-source").addEventListener("click", () =>
+  runServiceAction(() => window.classHub.startSource(shareFolder), { updatePeers: false })
+);
 
 document.getElementById("btn-stop").addEventListener("click", async () => {
   await window.classHub.stopSource();
-  const state = await window.classHub.getState();
-  setStatus(buildStatusMessage(state));
+  await refreshState({ updatePeers: false });
 });
 
-document.getElementById("btn-screen-start").addEventListener("click", async () => {
-  const result = await window.classHub.startScreenShare();
-  if (!result.ok) {
-    setStatus(result.message);
-    return;
-  }
-
-  const state = await window.classHub.getState();
-  renderPeers(state.peers);
-  setStatus(buildStatusMessage(state));
-
-  if (result.firewall && !result.firewall.ok) {
-    setStatus(`${buildStatusMessage(state)} | ${result.firewall.message}`);
-  }
-});
+document.getElementById("btn-screen-start").addEventListener("click", () =>
+  runServiceAction(() => window.classHub.startScreenShare())
+);
 
 document.getElementById("btn-screen-stop").addEventListener("click", async () => {
   await window.classHub.stopScreenShare();
-  const state = await window.classHub.getState();
-  renderPeers(state.peers);
-  setStatus(buildStatusMessage(state));
+  await refreshState();
 });
 
 document.getElementById("btn-open").addEventListener("click", async () => {
@@ -301,7 +298,7 @@ document.getElementById("btn-open").addEventListener("click", async () => {
     setStatus("Этот ПК не раздаёт файлы. Выберите источник.");
     return;
   }
-  await window.classHub.openUrl(`http://${peer.ip}:${peer.httpPort}/`);
+  await window.classHub.openUrl(buildSourceUrl(peer.ip, peer.httpPort));
 });
 
 document.getElementById("btn-update").addEventListener("click", async () => {

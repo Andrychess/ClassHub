@@ -155,14 +155,6 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
 function parentPath(path) {
   if (!path) {
     return "";

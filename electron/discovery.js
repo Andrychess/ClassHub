@@ -1,4 +1,6 @@
 const dgram = require("dgram");
+const { DISCOVERY_SCAN_INTERVAL_MS } = require("./constants");
+const { sortPeers } = require("./peers");
 const {
   PORT,
   MSG_DISCOVER,
@@ -65,7 +67,7 @@ class DiscoveryService {
     this.socket.bind(PORT, () => {
       this.upsertPeer(this.getSelfPeer(), MSG_HELLO);
       this.scan();
-      this.scanTimer = setInterval(() => this.scan(), 5000);
+      this.scanTimer = setInterval(() => this.scan(), DISCOVERY_SCAN_INTERVAL_MS);
     });
   }
 
@@ -163,11 +165,7 @@ class DiscoveryService {
   }
 
   getPeerList() {
-    return Array.from(this.peers.values()).sort((a, b) => {
-      if (a.isSelf) return -1;
-      if (b.isSelf) return 1;
-      return a.hostname.localeCompare(b.hostname, "ru");
-    });
+    return sortPeers(Array.from(this.peers.values()));
   }
 }
 

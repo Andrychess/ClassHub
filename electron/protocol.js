@@ -1,7 +1,8 @@
 const os = require("os");
 const dgram = require("dgram");
+const { DISCOVERY_PORT } = require("./constants");
 
-const PORT = 49500;
+const PORT = DISCOVERY_PORT;
 const MAGIC = "MEGACLEANER";
 const VERSION = "2";
 

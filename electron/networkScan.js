@@ -1,9 +1,17 @@
 const { execFile } = require("child_process");
 const { getPhysicalNetworkInterfaces, getAllLocalIps } = require("./protocol");
 const { resolveDeviceNames } = require("./deviceNames");
+const {
+  PING_TIMEOUT_MS,
+  SUBNET_BATCH_SIZE,
+  SUBNET_HOST_START,
+  SUBNET_HOST_END,
+} = require("./constants");
+const { sortPeers } = require("./peers");
+
 function pingHost(ip) {
   return new Promise((resolve) => {
-    execFile("ping", ["-n", "1", "-w", "350", ip], { windowsHide: true }, (error) => {
+    execFile("ping", ["-n", "1", "-w", String(PING_TIMEOUT_MS), ip], { windowsHide: true }, (error) => {
       resolve(!error);
     });
   });
@@ -35,9 +43,9 @@ function readArpTable() {
   });
 }
 
-async function scanSubnet(prefix, localIps, batchSize = 32) {
+async function scanSubnet(prefix, localIps, batchSize = SUBNET_BATCH_SIZE) {
   const targets = [];
-  for (let host = 1; host <= 254; host += 1) {
+  for (let host = SUBNET_HOST_START; host <= SUBNET_HOST_END; host += 1) {
     const ip = `${prefix}.${host}`;
     if (!localIps.has(ip)) {
       targets.push(ip);
@@ -81,7 +89,7 @@ async function scanLocalNetwork(options = {}) {
 
   const aliveSet = new Set();
   for (const prefix of prefixes) {
-    const alive = await scanSubnet(prefix, localIps, options.batchSize || 32);
+    const alive = await scanSubnet(prefix, localIps, options.batchSize || SUBNET_BATCH_SIZE);
     for (const ip of alive) {
       aliveSet.add(ip);
     }
@@ -133,14 +141,7 @@ function mergePeerLists(classHubPeers, networkDevices) {
     merged.set(device.ip, device);
   }
 
-  return Array.from(merged.values()).sort((a, b) => {
-    if (a.isSelf) return -1;
-    if (b.isSelf) return 1;
-    if (a.hasClassHub !== b.hasClassHub) {
-      return a.hasClassHub ? -1 : 1;
-    }
-    return a.hostname.localeCompare(b.hostname, "ru");
-  });
+  return sortPeers(Array.from(merged.values()));
 }
 
 function getNetworkSummary() {
