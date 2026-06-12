@@ -108,6 +108,17 @@
           <button id="btn-screen-start" class="btn primary">Показать экран учителю</button>
           <button id="btn-screen-stop" class="btn danger">Остановить показ</button>
         </div>
+        <div id="stream-link-box" class="source-link-box hidden">
+          <span class="label">Ссылка на трансляцию</span>
+          <div class="source-link-row">
+            <input id="stream-link" type="text" readonly />
+            <button id="btn-copy-stream" class="btn primary">Копировать</button>
+            <button id="btn-open-stream" class="btn">Открыть</button>
+          </div>
+          <p class="hint source-link-hint">
+            Учитель может открыть эту ссылку в браузере или нажать «Обновить список» в ClassHub.
+          </p>
+        </div>
       </section>
 
       <section class="card screens-section">
@@ -117,7 +128,7 @@
         </div>
         <p class="hint">
           Здесь отображаются экраны учеников, которые включили трансляцию.
-          Для проверки откройте в браузере: <strong>http://IP_ученика:8766/stream</strong>
+          Для проверки откройте в браузере: <strong>http://IP_ученика:8766/frame.jpg</strong>
         </p>
         <div id="screen-grid" class="screen-grid">
           <div class="screen-empty muted">Пока никто не транслирует экран</div>

@@ -106,12 +106,8 @@ async function enrichDevicesWithNetworkServices(devices, batchSize = 16) {
 
         return {
           ...device,
+          ...buildServiceHint(source, stream),
           hostname: source?.hostname || stream?.hostname || device.hostname,
-          hasClassHub: true,
-          isSource: Boolean(source),
-          httpPort: source?.httpPort || device.httpPort,
-          isStreaming: Boolean(stream),
-          streamPort: stream?.streamPort || device.streamPort,
           detectedViaHttp: true,
         };
       })
@@ -126,4 +122,20 @@ module.exports = {
   probeHttpSource,
   probeHttpStream,
   enrichDevicesWithNetworkServices,
+  buildServiceHint,
 };
+
+function buildServiceHint(source, stream) {
+  if (!source && !stream) {
+    return null;
+  }
+
+  return {
+    hasClassHub: true,
+    isSource: Boolean(source),
+    httpPort: source?.httpPort || null,
+    isStreaming: Boolean(stream),
+    streamPort: stream?.streamPort || null,
+    hostname: source?.hostname || stream?.hostname || null,
+  };
+}

@@ -3,35 +3,45 @@ param(
   [string]$Bump = "patch",
   [switch]$SkipPush,
   [switch]$SkipBuild,
-  [switch]$SkipUpload
+  [switch]$SkipUpload,
+  [switch]$SkipBump
 )
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
 Set-Location $root
 
-Write-Host "ClassHub release: bump $Bump" -ForegroundColor Cyan
-
-$version = node (Join-Path $PSScriptRoot "bump-version.js") $Bump
-if ($LASTEXITCODE -ne 0) {
-  exit $LASTEXITCODE
+function Test-GitTagExists([string]$TagName) {
+  $existing = git tag -l $TagName
+  return [bool]$existing
 }
 
-$tag = "v$version"
-Write-Host "New version: $version ($tag)" -ForegroundColor Green
-
-git add package.json package-lock.json
-$pending = git diff --cached --name-only
-if (-not $pending) {
-  Write-Host "No version changes to commit." -ForegroundColor Yellow
+if ($SkipBump) {
+  $version = (Get-Content (Join-Path $root "package.json") -Raw | ConvertFrom-Json).version
+  Write-Host "Continuing release without bump: $version" -ForegroundColor Cyan
 } else {
-  git commit -m "Release $version"
+  Write-Host "ClassHub release: bump $Bump" -ForegroundColor Cyan
+  $version = node (Join-Path $PSScriptRoot "bump-version.js") $Bump
   if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
   }
+
+  git add package.json package-lock.json
+  $pending = git diff --cached --name-only
+  if ($pending) {
+    git commit -m "Release $version"
+    if ($LASTEXITCODE -ne 0) {
+      exit $LASTEXITCODE
+    }
+  } else {
+    Write-Host "Version files already committed." -ForegroundColor Yellow
+  }
 }
 
-if (git rev-parse "$tag" 2>$null) {
+$tag = "v$version"
+Write-Host "Release version: $version ($tag)" -ForegroundColor Green
+
+if (Test-GitTagExists $tag) {
   Write-Host "Tag $tag already exists. Delete it or choose another bump type." -ForegroundColor Red
   exit 1
 }
@@ -64,7 +74,20 @@ if (-not $SkipUpload) {
 if (-not $SkipPush) {
   Write-Host "Pushing to GitHub..." -ForegroundColor Cyan
   git push origin HEAD
-  git push origin $tag
+  if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+  }
+
+  git push origin $tag 2>&1 | ForEach-Object { Write-Host $_ }
+  if ($LASTEXITCODE -ne 0) {
+    $tagOnRemote = git ls-remote --tags origin "refs/tags/$tag"
+    if ($tagOnRemote) {
+      Write-Host "Tag $tag already exists on GitHub. Skipping tag push." -ForegroundColor Yellow
+    } else {
+      exit $LASTEXITCODE
+    }
+  }
+
   Write-Host ""
   Write-Host "GitHub Actions will also build release for tag $tag." -ForegroundColor DarkGray
 }

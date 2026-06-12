@@ -4,7 +4,7 @@ const ctx = canvas.getContext("2d");
 
 const TARGET_WIDTH = 960;
 const TARGET_HEIGHT = 540;
-const FRAME_INTERVAL_MS = 200;
+const FRAME_INTERVAL_MS = 250;
 const JPEG_QUALITY = 0.55;
 
 let captureTimer = null;
@@ -45,39 +45,53 @@ async function sendFrame() {
   window.captureApi.sendFrame(buffer);
 }
 
-async function startCapture() {
-  try {
-    const sourceId = await window.captureApi.getSourceId();
-    if (!sourceId) {
-      throw new Error("Экран для захвата не найден");
-    }
+async function startLegacyCapture(sourceId) {
+  const modernConstraints = {
+    audio: false,
+    video: {
+      chromeMediaSource: "desktop",
+      chromeMediaSourceId: sourceId,
+      maxWidth: 1920,
+      maxHeight: 1080,
+      maxFrameRate: 10,
+    },
+  };
 
-    const modernConstraints = {
+  try {
+    return await navigator.mediaDevices.getUserMedia(modernConstraints);
+  } catch {
+    return navigator.mediaDevices.getUserMedia({
       audio: false,
       video: {
-        chromeMediaSource: "desktop",
-        chromeMediaSourceId: sourceId,
-        maxWidth: 1920,
-        maxHeight: 1080,
-        maxFrameRate: 10,
+        mandatory: {
+          chromeMediaSource: "desktop",
+          chromeMediaSourceId: sourceId,
+          maxWidth: 1920,
+          maxHeight: 1080,
+          maxFrameRate: 10,
+        },
       },
-    };
+    });
+  }
+}
 
-    try {
-      mediaStream = await navigator.mediaDevices.getUserMedia(modernConstraints);
-    } catch {
-      mediaStream = await navigator.mediaDevices.getUserMedia({
+async function startCapture() {
+  try {
+    if (navigator.mediaDevices.getDisplayMedia) {
+      mediaStream = await navigator.mediaDevices.getDisplayMedia({
         audio: false,
         video: {
-          mandatory: {
-            chromeMediaSource: "desktop",
-            chromeMediaSourceId: sourceId,
-            maxWidth: 1920,
-            maxHeight: 1080,
-            maxFrameRate: 10,
-          },
+          frameRate: { ideal: 5, max: 10 },
+          width: { ideal: 1920, max: 1920 },
+          height: { ideal: 1080, max: 1080 },
         },
       });
+    } else {
+      const sourceId = await window.captureApi.getSourceId();
+      if (!sourceId) {
+        throw new Error("Экран для захвата не найден");
+      }
+      mediaStream = await startLegacyCapture(sourceId);
     }
 
     video.srcObject = mediaStream;

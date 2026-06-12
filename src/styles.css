@@ -179,6 +179,14 @@ tbody tr.selected {
   background: #22304a;
 }
 
+tbody tr.peer-live {
+  background: rgba(46, 160, 87, 0.1);
+}
+
+tbody tr.peer-live.selected {
+  background: rgba(46, 160, 87, 0.16);
+}
+
 tbody tr.empty-row {
   cursor: default;
 }

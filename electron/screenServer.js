@@ -61,12 +61,26 @@ class ScreenServer {
       });
     });
 
+    app.get("/frame.jpg", (_req, res) => {
+      if (!this.latestFrame) {
+        res.status(204).end();
+        return;
+      }
+
+      res.set({
+        "Content-Type": "image/jpeg",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+      });
+      res.send(this.latestFrame);
+    });
+
     app.get("/stream", (req, res) => {
       res.writeHead(200, {
         "Content-Type": `multipart/x-mixed-replace; boundary=${BOUNDARY}`,
         "Cache-Control": "no-cache, no-store, must-revalidate",
         Pragma: "no-cache",
-        Connection: "close",
+        Connection: "keep-alive",
       });
 
       this.clients.add(res);

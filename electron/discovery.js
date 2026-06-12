@@ -225,7 +225,7 @@ class DiscoveryService {
         ...peer,
         isSource: peer.isSource ?? existing.isSource ?? false,
         httpPort: peer.httpPort ?? existing.httpPort ?? null,
-        isStreaming: peer.isStreaming ?? existing.isStreaming ?? false,
+        isStreaming: Boolean(peer.isStreaming) || Boolean(existing.isStreaming),
         streamPort: peer.streamPort ?? existing.streamPort ?? null,
       };
     }

@@ -126,32 +126,48 @@ function guessDeviceName(ip, arpHost) {
   return arpHost;
 }
 
-function mergePeerLists(classHubPeers, networkDevices) {
+function mergePeerWithServices(peer, services) {
+  if (!services) {
+    return peer;
+  }
+
+  return {
+    ...peer,
+    hasClassHub: peer.hasClassHub || services.hasClassHub,
+    hostname: services.hostname || peer.hostname,
+    isSource: peer.isSource || services.isSource,
+    httpPort: peer.httpPort || services.httpPort,
+    isStreaming: peer.isStreaming || services.isStreaming,
+    streamPort: peer.streamPort || services.streamPort,
+  };
+}
+
+function mergePeerLists(classHubPeers, networkDevices, serviceHints = new Map()) {
   const merged = new Map();
 
   for (const peer of classHubPeers) {
-    merged.set(peer.ip, {
+    merged.set(peer.ip, mergePeerWithServices({
       ...peer,
       hasClassHub: true,
       isNetworkDevice: false,
-    });
+    }, serviceHints.get(peer.ip)));
   }
 
   for (const device of networkDevices) {
+    const withServices = mergePeerWithServices(device, serviceHints.get(device.ip));
     const existing = merged.get(device.ip);
     if (existing) {
-      merged.set(device.ip, {
-        ...existing,
-        hasClassHub: existing.hasClassHub || device.hasClassHub,
-        hostname: existing.hostname || device.hostname,
-        isSource: existing.isSource || device.isSource,
-        httpPort: existing.httpPort || device.httpPort,
-        isStreaming: existing.isStreaming || device.isStreaming,
-        streamPort: existing.streamPort || device.streamPort,
-      });
+      merged.set(device.ip, mergePeerWithServices(existing, {
+        hasClassHub: existing.hasClassHub || withServices.hasClassHub,
+        hostname: withServices.hostname || existing.hostname,
+        isSource: existing.isSource || withServices.isSource,
+        httpPort: existing.httpPort || withServices.httpPort,
+        isStreaming: existing.isStreaming || withServices.isStreaming,
+        streamPort: existing.streamPort || withServices.streamPort,
+      }));
       continue;
     }
-    merged.set(device.ip, device);
+    merged.set(device.ip, withServices);
   }
 
   return sortPeers(Array.from(merged.values()));

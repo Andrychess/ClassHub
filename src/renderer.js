@@ -10,6 +10,8 @@ const folderSelect = document.getElementById("folder-select");
 const folderPath = document.getElementById("folder-path");
 const sourceLinkBox = document.getElementById("source-link-box");
 const sourceLinkInput = document.getElementById("source-link");
+const streamLinkBox = document.getElementById("stream-link-box");
+const streamLinkInput = document.getElementById("stream-link");
 const appVersionEl = document.getElementById("app-version");
 
 let peers = [];
@@ -17,9 +19,26 @@ let selectedIp = null;
 let shareFolder = null;
 let savedFolders = [];
 let activeSourceUrl = null;
+let activeStreamUrl = null;
+let screenRefreshTimers = [];
+
+function clearScreenRefreshTimers() {
+  for (const timerId of screenRefreshTimers) {
+    clearInterval(timerId);
+  }
+  screenRefreshTimers = [];
+}
 
 function setStatus(message) {
   statusEl.textContent = message;
+}
+
+function peerIsOnAir(peer) {
+  return Boolean(peer.isStreaming) || Boolean(peer.streamPort);
+}
+
+function peerStreamPort(peer) {
+  return peer.streamPort || 8766;
 }
 
 function renderPeers(list) {
@@ -49,17 +68,18 @@ function renderPeers(list) {
           ? "Источник"
           : "Клиент"
         : "В сети";
-      const screen =
-        peer.isStreaming && peer.streamPort
-          ? '<span class="role-source">В эфире</span>'
-          : '<span class="role-client">—</span>';
+      const screen = peerIsOnAir(peer)
+        ? '<span class="role-source">В эфире</span>'
+        : '<span class="role-client">—</span>';
       const url =
         peer.isSource && peer.httpPort
           ? `<span class="url-link">${escapeHtml(buildSourceUrl(peer.ip, peer.httpPort))}</span>`
           : "—";
 
+      const liveClass = peerIsOnAir(peer) && !peer.isSelf ? "peer-live" : "";
+
       return `
-        <tr data-ip="${escapeHtml(peer.ip)}" class="${selected}">
+        <tr data-ip="${escapeHtml(peer.ip)}" class="${selected} ${liveClass}">
           <td>${name}</td>
           <td>${escapeHtml(peer.ip)}</td>
           <td class="${roleClass}">${role}</td>
@@ -79,7 +99,8 @@ function renderPeers(list) {
 }
 
 function renderScreenGrid(list) {
-  const streaming = list.filter((peer) => peer.isStreaming && peer.streamPort && !peer.isSelf);
+  clearScreenRefreshTimers();
+  const streaming = list.filter((peer) => peerIsOnAir(peer) && !peer.isSelf);
   screenCount.textContent = String(streaming.length);
 
   if (!streaming.length) {
@@ -89,7 +110,8 @@ function renderScreenGrid(list) {
 
   screenGrid.innerHTML = streaming
     .map((peer) => {
-      const streamUrl = buildStreamUrl(peer.ip, peer.streamPort);
+      const frameUrl = buildFrameUrl(peer.ip, peerStreamPort(peer));
+      const streamUrl = buildStreamUrl(peer.ip, peerStreamPort(peer));
       return `
         <article class="screen-card">
           <div class="screen-card-head">
@@ -101,11 +123,12 @@ function renderScreenGrid(list) {
           </div>
           <img
             class="screen-preview"
-            src="${escapeHtml(streamUrl)}"
+            data-frame-url="${escapeHtml(frameUrl)}"
+            src="${escapeHtml(`${frameUrl}?t=${Date.now()}`)}"
             alt="Экран ${escapeHtml(peer.hostname)}"
           />
           <p class="screen-fallback muted hidden">
-            Поток не загрузился. Откройте ссылку в браузере или проверьте брандмауэр (порт 8766).
+            Кадры не приходят. Проверьте брандмауэр на ПК ученика (порт 8766) и нажмите «Обновить список».
           </p>
         </article>
       `;
@@ -119,6 +142,12 @@ function renderScreenGrid(list) {
   });
 
   screenGrid.querySelectorAll(".screen-preview").forEach((image) => {
+    const frameBase = image.dataset.frameUrl;
+    const timerId = setInterval(() => {
+      image.src = `${frameBase}?t=${Date.now()}`;
+    }, 400);
+    screenRefreshTimers.push(timerId);
+
     image.addEventListener("error", () => {
       image.classList.add("hidden");
       image.parentElement.querySelector(".screen-fallback")?.classList.remove("hidden");
@@ -157,6 +186,7 @@ function getSelectedPeer() {
 
 function buildStatusMessage(state) {
   updateSourceLinkBox(state.sourceUrl, state.isSource);
+  updateStreamLinkBox(state.streamUrl, state.isScreenSharing);
   if (state.isSource && state.sourceUrl) {
     return `Источник активен: ${state.sourceUrl}`;
   }
@@ -172,6 +202,21 @@ function formatStatusWithFirewall(state, firewall) {
     return `${message} | ${firewall.message}`;
   }
   return message;
+}
+
+function updateStreamLinkBox(streamUrl, isScreenSharing) {
+  activeStreamUrl = isScreenSharing && streamUrl ? streamUrl : null;
+  if (!streamLinkBox || !streamLinkInput) {
+    return;
+  }
+
+  if (activeStreamUrl) {
+    streamLinkBox.classList.remove("hidden");
+    streamLinkInput.value = activeStreamUrl;
+  } else {
+    streamLinkBox.classList.add("hidden");
+    streamLinkInput.value = "";
+  }
 }
 
 function updateSourceLinkBox(sourceUrl, isSource) {
@@ -347,6 +392,22 @@ document.getElementById("btn-open-source").addEventListener("click", async () =>
     return;
   }
   await window.classHub.openUrl(activeSourceUrl);
+});
+
+document.getElementById("btn-copy-stream").addEventListener("click", async () => {
+  if (!activeStreamUrl) {
+    setStatus("Сначала включите трансляцию экрана.");
+    return;
+  }
+  await window.classHub.copyToClipboard(activeStreamUrl);
+  setStatus("Ссылка на трансляцию скопирована.");
+});
+
+document.getElementById("btn-open-stream").addEventListener("click", async () => {
+  if (!activeStreamUrl) {
+    return;
+  }
+  await window.classHub.openUrl(activeStreamUrl);
 });
 
 window.classHub.onPeersUpdated((list) => {

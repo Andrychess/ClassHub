@@ -122,10 +122,11 @@ function registerIpcHandlers(appContext) {
 
       const result = await appContext.screenServer.start();
       appContext.setCaptureSourceId(captureSourceId);
-      appContext.createCaptureWindow();
       appContext.setScreenSharing(true);
+      appContext.startScreenCaptureLoop();
       appContext.discovery.announceScreen(result.port);
-      appContext.sendStatus(`Трансляция экрана: ${result.url}`);
+      appContext.refreshServiceHints().catch(() => {});
+      appContext.sendStatus(`Трансляция экрана: ${result.url}. У учителя в списке появится «В эфире» в течение нескольких секунд.`);
 
       return {
         ok: true,
@@ -150,7 +151,7 @@ function registerIpcHandlers(appContext) {
   ipcMain.handle("capture-get-source-id", () => appContext.getCaptureSourceId());
 
   ipcMain.on("capture-frame", (_event, buffer) => {
-    if (!appContext.isScreenSharing || !appContext.screenServer) {
+    if (!appContext.screenServer?.isRunning) {
       return;
     }
     appContext.screenServer.setFrame(Buffer.from(buffer));
