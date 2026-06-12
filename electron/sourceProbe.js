@@ -22,6 +22,8 @@ function probeHttpSource(ip, port = FILE_SERVER_PORT, timeoutMs = 1200) {
             httpPort: port,
             isSource: true,
             hasClassHub: true,
+            classId: info.classId || null,
+            className: info.className || null,
           });
         } catch {
           resolve({
@@ -42,8 +44,35 @@ function probeHttpSource(ip, port = FILE_SERVER_PORT, timeoutMs = 1200) {
   });
 }
 
-function probeHttpStream(ip, port = SCREEN_SERVER_PORT, timeoutMs = 1200) {
+function probeStreamHeaders(ip, port = SCREEN_SERVER_PORT, timeoutMs = 1200) {
   return new Promise((resolve) => {
+    const request = http.get(`http://${ip}:${port}/stream`, { timeout: timeoutMs }, (response) => {
+      const contentType = String(response.headers["content-type"] || "");
+      const isStream =
+        response.statusCode === 200 && contentType.includes("multipart/x-mixed-replace");
+      request.destroy();
+      if (!isStream) {
+        resolve(null);
+        return;
+      }
+      resolve({
+        ip,
+        streamPort: port,
+        isStreaming: true,
+        hasClassHub: true,
+      });
+    });
+
+    request.on("error", () => resolve(null));
+    request.on("timeout", () => {
+      request.destroy();
+      resolve(null);
+    });
+  });
+}
+
+async function probeHttpStream(ip, port = SCREEN_SERVER_PORT, timeoutMs = 1200) {
+  const statusResult = await new Promise((resolve) => {
     const request = http.get(`http://${ip}:${port}/status`, { timeout: timeoutMs }, (response) => {
       let body = "";
       response.on("data", (chunk) => {
@@ -86,6 +115,12 @@ function probeHttpStream(ip, port = SCREEN_SERVER_PORT, timeoutMs = 1200) {
       resolve(null);
     });
   });
+
+  if (statusResult) {
+    return statusResult;
+  }
+
+  return probeStreamHeaders(ip, port, timeoutMs);
 }
 
 async function enrichDevicesWithNetworkServices(devices, batchSize = 16) {
@@ -118,13 +153,6 @@ async function enrichDevicesWithNetworkServices(devices, batchSize = 16) {
   return enriched;
 }
 
-module.exports = {
-  probeHttpSource,
-  probeHttpStream,
-  enrichDevicesWithNetworkServices,
-  buildServiceHint,
-};
-
 function buildServiceHint(source, stream) {
   if (!source && !stream) {
     return null;
@@ -137,5 +165,14 @@ function buildServiceHint(source, stream) {
     isStreaming: Boolean(stream),
     streamPort: stream?.streamPort || null,
     hostname: source?.hostname || stream?.hostname || null,
+    classId: source?.classId || null,
+    className: source?.className || null,
   };
 }
+
+module.exports = {
+  probeHttpSource,
+  probeHttpStream,
+  enrichDevicesWithNetworkServices,
+  buildServiceHint,
+};

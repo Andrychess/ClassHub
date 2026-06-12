@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { app } = require("electron");
-const { MAX_SAVED_FOLDERS } = require("./constants");
+const { MAX_SAVED_FOLDERS, MAX_PINNED_APPS } = require("./constants");
 
 function getSettingsPath() {
   return path.join(app.getPath("userData"), "folders.json");
@@ -11,7 +11,25 @@ function defaultSettings() {
   return {
     savedFolders: [],
     lastSelectedFolder: null,
+    pinnedApps: [],
   };
+}
+
+function normalizePinnedApps(pinnedApps) {
+  if (!Array.isArray(pinnedApps)) {
+    return [];
+  }
+
+  const unique = [];
+  for (const item of pinnedApps) {
+    const value = String(item || "").trim();
+    if (!value || unique.includes(value)) {
+      continue;
+    }
+    unique.push(value);
+  }
+
+  return unique.slice(0, MAX_PINNED_APPS);
 }
 
 function loadSettings() {
@@ -24,6 +42,7 @@ function loadSettings() {
     return {
       savedFolders: Array.isArray(data.savedFolders) ? data.savedFolders : [],
       lastSelectedFolder: data.lastSelectedFolder || null,
+      pinnedApps: normalizePinnedApps(data.pinnedApps),
     };
   } catch {
     return defaultSettings();
@@ -120,6 +139,32 @@ function getSelectedFolder() {
   return readFolderState().lastSelectedFolder;
 }
 
+function readPinnedApps() {
+  return normalizePinnedApps(loadSettings().pinnedApps);
+}
+
+function togglePinnedApp(appPath) {
+  const normalized = String(appPath || "").trim();
+  if (!normalized) {
+    return { ok: false, message: "Не указана программа.", pinnedApps: readPinnedApps() };
+  }
+
+  const settings = loadSettings();
+  const pinnedApps = normalizePinnedApps(settings.pinnedApps);
+  const index = pinnedApps.indexOf(normalized);
+
+  if (index >= 0) {
+    pinnedApps.splice(index, 1);
+  } else {
+    pinnedApps.unshift(normalized);
+  }
+
+  settings.pinnedApps = pinnedApps.slice(0, MAX_PINNED_APPS);
+  saveSettings(settings);
+
+  return { ok: true, pinnedApps: settings.pinnedApps };
+}
+
 module.exports = {
   addSavedFolder,
   removeSavedFolder,
@@ -128,4 +173,6 @@ module.exports = {
   syncFolderState,
   getSelectedFolder,
   folderExists,
+  readPinnedApps,
+  togglePinnedApp,
 };

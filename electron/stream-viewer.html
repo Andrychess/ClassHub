@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src http: data:; style-src 'unsafe-inline'"
+    />
+    <title>ClassHub — трансляция</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        background: #000;
+        overflow: hidden;
+      }
+
+      img {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+        object-fit: contain;
+        background: #000;
+      }
+
+      .message {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        color: #c8d0dc;
+        font: 14px/1.5 Segoe UI, sans-serif;
+        padding: 24px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <img id="stream" alt="Трансляция экрана" hidden />
+    <div id="message" class="message">Подключение к трансляции...</div>
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const streamUrl = params.get("url");
+      const image = document.getElementById("stream");
+      const message = document.getElementById("message");
+
+      if (!streamUrl) {
+        message.textContent = "Не указана ссылка на трансляцию.";
+      } else {
+        image.src = streamUrl;
+        image.addEventListener("load", () => {
+          image.hidden = false;
+          message.hidden = true;
+        });
+        image.addEventListener("error", () => {
+          message.textContent =
+            "Не удалось показать трансляцию. Проверьте ссылку и брандмауэр (порт 8766).";
+        });
+      }
+    </script>
+  </body>
+</html>

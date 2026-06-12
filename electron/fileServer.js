@@ -14,6 +14,7 @@ class FileServer {
   constructor() {
     this.port = FILE_SERVER_PORT;
     this.directory = null;
+    this.classMeta = null;
     this.server = null;
   }
 
@@ -25,12 +26,25 @@ class FileServer {
     return buildLocalSourceUrl(this.port);
   }
 
-  async start(directory) {
+  updateClassMeta(classMeta = {}) {
+    if (!this.classMeta) {
+      this.classMeta = classMeta;
+      return;
+    }
+
+    this.classMeta = {
+      ...this.classMeta,
+      ...classMeta,
+    };
+  }
+
+  async start(directory, classMeta = null) {
     if (this.server) {
       return { ok: true, url: this.url, port: this.port };
     }
 
     this.directory = path.resolve(directory);
+    this.classMeta = classMeta;
     const app = express();
 
     app.get("/api/info", (_req, res) => {
@@ -38,6 +52,21 @@ class FileServer {
         rootName: path.basename(this.directory),
         hostname: getHostname(),
         ip: getLocalIp(),
+        classId: this.classMeta?.classId || null,
+        className: this.classMeta?.className || null,
+      });
+    });
+
+    app.get("/api/class", (_req, res) => {
+      if (!this.classMeta) {
+        res.status(404).json({ message: "Класс не настроен." });
+        return;
+      }
+
+      res.json({
+        classId: this.classMeta.classId,
+        className: this.classMeta.className,
+        visibleApps: this.classMeta.visibleApps || [],
       });
     });
 
@@ -120,6 +149,7 @@ class FileServer {
     await closeServer(this.server);
     this.server = null;
     this.directory = null;
+    this.classMeta = null;
   }
 }
 

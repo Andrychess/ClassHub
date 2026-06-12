@@ -9,7 +9,7 @@
   </head>
   <body>
     <div class="page">
-      <header class="topbar">
+      <header class="topbar standalone-only">
         <div class="brand">
           <img class="brand-icon" src="assets/logo.png" width="64" height="64" alt="ClassHub" />
           <div>
@@ -24,38 +24,45 @@
         </div>
       </header>
 
-      <section class="panel toolbar">
-        <button id="btn-up" class="btn" title="На уровень выше">↑ Вверх</button>
-        <button id="btn-refresh" class="btn primary">Обновить</button>
-        <div class="search-wrap">
-          <input id="search" type="search" placeholder="Поиск по имени..." />
+      <div class="browser">
+        <div class="browser-bar panel">
+          <div class="browser-bar-main">
+            <div class="browser-actions">
+              <button id="btn-up" class="btn btn-icon" type="button" title="На уровень выше" aria-label="На уровень выше">↑</button>
+              <button id="btn-refresh" class="btn btn-icon primary" type="button" title="Обновить" aria-label="Обновить">↻</button>
+            </div>
+            <nav id="breadcrumbs" class="breadcrumbs" aria-label="Путь">
+              <button class="crumb-btn" data-path="" type="button">Корень</button>
+            </nav>
+          </div>
+          <div class="browser-bar-side">
+            <input id="search" type="search" placeholder="Поиск..." autocomplete="off" />
+            <span id="item-count" class="badge">0</span>
+          </div>
         </div>
-        <span id="item-count" class="badge">0</span>
-      </section>
 
-      <nav id="breadcrumbs" class="panel breadcrumbs" aria-label="Путь"></nav>
+        <section class="files-panel panel">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Имя</th>
+                  <th>Размер</th>
+                  <th class="col-modified">Изменён</th>
+                  <th class="col-action"></th>
+                </tr>
+              </thead>
+              <tbody id="files-body">
+                <tr class="state-row">
+                  <td colspan="4">Загрузка...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
 
-      <section class="panel files-panel">
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Имя</th>
-                <th>Размер</th>
-                <th>Изменён</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="files-body">
-              <tr class="state-row">
-                <td colspan="4">Загрузка...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <footer class="footer muted">
+      <footer class="footer muted standalone-only">
         Файлы раздаются внутри локальной сети класса — только для участников группы.
       </footer>
     </div>

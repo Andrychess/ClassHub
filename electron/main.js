@@ -4,12 +4,24 @@ const path = require("path");
 const { DiscoveryService } = require("./discovery");
 const { FileServer } = require("./fileServer");
 const { ScreenServer } = require("./screenServer");
+const { ChatServer } = require("./chatServer");
+const { postChatMessage } = require("./chatDelivery");
 const { scanLocalNetwork, mergePeerLists } = require("./networkScan");
 const { probeHttpSource, probeHttpStream, buildServiceHint } = require("./sourceProbe");
+const { getLocalIp, getHostname } = require("./protocol");
 const { syncFolderState } = require("./settings");
+const {
+  getActiveClass,
+  getSharingClass,
+  getJoinedClass,
+  readClassesState,
+} = require("./classes");
 const { ensureClassHubFirewallRules } = require("./firewall");
 const { setStatusHandler } = require("./updater");
 const { registerIpcHandlers } = require("./ipc");
+const { normalizeHttpUrl, buildStreamUrl } = require("./urls");
+const { buildTeacherApiPayload, discoverTeacherClasses } = require("./teacherDiscovery");
+const { saveLastRole, clearLastRole } = require("./deviceSession");
 const {
   MAIN_WINDOW,
   CAPTURE_WINDOW,
@@ -22,15 +34,18 @@ const {
 
 let mainWindow = null;
 let captureWindow = null;
+let streamViewerWindow = null;
 let discovery = null;
 let fileServer = null;
 let screenServer = null;
+let chatServer = null;
 let captureSourceId = null;
 let isScreenSharing = false;
 let networkDevices = [];
 let screenCaptureTimer = null;
 let serviceHints = new Map();
 let serviceProbeRunning = false;
+let appRole = null;
 
 function getHtmlPath() {
   return path.join(app.getAppPath(), "src", "index.html");
@@ -38,6 +53,46 @@ function getHtmlPath() {
 
 function getCaptureHtmlPath() {
   return path.join(app.getAppPath(), "src", "capture.html");
+}
+
+function openStreamViewer(url) {
+  const normalized = normalizeHttpUrl(url);
+  if (!normalized) {
+    return { ok: false, message: "Не указана ссылка на трансляцию." };
+  }
+
+  if (streamViewerWindow && !streamViewerWindow.isDestroyed()) {
+    streamViewerWindow.loadFile(path.join(__dirname, "stream-viewer.html"), {
+      query: { url: normalized },
+    });
+    streamViewerWindow.focus();
+    return { ok: true, url: normalized };
+  }
+
+  streamViewerWindow = new BrowserWindow({
+    width: 960,
+    height: 620,
+    title: "ClassHub — трансляция экрана",
+    backgroundColor: "#000000",
+    autoHideMenuBar: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  streamViewerWindow.loadFile(path.join(__dirname, "stream-viewer.html"), {
+    query: { url: normalized },
+  });
+  streamViewerWindow.on("closed", () => {
+    streamViewerWindow = null;
+  });
+
+  return { ok: true, url: normalized };
+}
+
+function openStreamViewerForIp(ip, port = SCREEN_SERVER_PORT) {
+  return openStreamViewer(buildStreamUrl(ip, port));
 }
 
 function createWindow() {
@@ -196,6 +251,153 @@ function broadcastPeers(peers) {
   }
 }
 
+function pushChatMessage(message, { self = false } = {}) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("chat-message", { ...message, self });
+  }
+}
+
+function getAppRole() {
+  return appRole;
+}
+
+function setAppRole(role) {
+  appRole = role === "teacher" || role === "student" ? role : null;
+  if (appRole) {
+    saveLastRole(appRole);
+  } else {
+    clearLastRole();
+  }
+  syncDiscoveryClassContext();
+}
+
+function syncDiscoveryClassContext() {
+  if (!discovery) {
+    return;
+  }
+
+  discovery.setRoleContext(appRole);
+
+  const sharingClass = getSharingClass();
+  const joinedClass = getJoinedClass();
+  const activeClass = getActiveClass();
+
+  if (sharingClass) {
+    discovery.setClassContext({
+      classId: sharingClass.id,
+      className: sharingClass.name,
+    });
+    return;
+  }
+
+  if (joinedClass?.classId) {
+    discovery.setClassContext({
+      classId: joinedClass.classId,
+      className: joinedClass.className,
+    });
+    return;
+  }
+
+  if (activeClass) {
+    discovery.setClassContext({
+      classId: activeClass.id,
+      className: activeClass.name,
+    });
+    return;
+  }
+
+  discovery.setClassContext({ classId: null, className: null });
+}
+
+function getLocalClassId() {
+  const sharingClass = getSharingClass();
+  if (sharingClass) {
+    return sharingClass.id;
+  }
+
+  const joinedClass = getJoinedClass();
+  return joinedClass?.classId || null;
+}
+
+function getChatPeerIps() {
+  const localClassId = getLocalClassId();
+  const ips = new Set();
+
+  for (const peer of getMergedPeers()) {
+    if (peer.isSelf || !peer.ip) {
+      continue;
+    }
+
+    if (localClassId && peer.classId && peer.classId !== localClassId) {
+      continue;
+    }
+
+    ips.add(peer.ip);
+  }
+
+  return [...ips];
+}
+
+async function sendChatMessage(text) {
+  const trimmed = String(text || "").trim();
+  if (!trimmed) {
+    return { ok: false, message: "Введите текст сообщения." };
+  }
+
+  if (!chatServer?.isRunning) {
+    return { ok: false, message: "Чат не запущен на этом ПК." };
+  }
+
+  const message = chatServer.addMessage(
+    {
+      hostname: getHostname(),
+      ip: getLocalIp(),
+      text: trimmed,
+      ts: Date.now(),
+      classId: getLocalClassId(),
+    },
+    { notify: false }
+  );
+
+  if (!message) {
+    return { ok: false, message: "Не удалось отправить сообщение." };
+  }
+
+  pushChatMessage(message, { self: true });
+
+  const targets = getChatPeerIps();
+  const results = await Promise.allSettled(
+    targets.map((ip) => postChatMessage(ip, message))
+  );
+  const delivered = results.filter((result) => result.status === "fulfilled" && result.value).length;
+
+  return {
+    ok: true,
+    message,
+    delivered,
+    targets: targets.length,
+  };
+}
+
+function setupChatServer() {
+  chatServer = new ChatServer();
+  chatServer.setMessageHandler((message) => {
+    pushChatMessage(message, { self: false });
+  });
+  chatServer.setTeacherInfoProvider(() => {
+    const state = readClassesState();
+    return buildTeacherApiPayload(state, appRole);
+  });
+}
+
+async function discoverTeacherClassesInNetwork() {
+  return discoverTeacherClasses({
+    scanNetwork: scanNetworkDevices,
+    discoveryScan: () => discovery?.scan(),
+    getPeers: getMergedPeers,
+  });
+}
+
 function collectPeerIps() {
   const ips = new Set();
   for (const peer of discovery?.getPeerList() ?? []) {
@@ -287,6 +489,9 @@ const appContext = {
   get screenServer() {
     return screenServer;
   },
+  get chatServer() {
+    return chatServer;
+  },
   get isScreenSharing() {
     return isScreenSharing;
   },
@@ -301,6 +506,14 @@ const appContext = {
   getMergedPeers,
   scanNetworkDevices,
   refreshServiceHints,
+  openStreamViewer,
+  openStreamViewerForIp,
+  sendChatMessage,
+  syncDiscoveryClassContext,
+  getLocalClassId,
+  getAppRole,
+  setAppRole,
+  discoverTeacherClassesInNetwork,
   createCaptureWindow,
   stopScreenShare,
   pickScreenSourceId,
@@ -318,7 +531,14 @@ app.whenReady().then(async () => {
   syncFolderState();
   fileServer = new FileServer();
   screenServer = new ScreenServer();
+  setupChatServer();
+  try {
+    await chatServer.start();
+  } catch (error) {
+    sendStatus(`Чат недоступен: ${error.message}`);
+  }
   setupDiscovery();
+  syncDiscoveryClassContext();
   createWindow();
   setTimeout(() => {
     scanNetworkDevices().catch(() => {});
@@ -341,6 +561,9 @@ app.on("window-all-closed", async () => {
   await stopScreenShare();
   if (fileServer) {
     await fileServer.stop();
+  }
+  if (chatServer) {
+    await chatServer.stop();
   }
   if (discovery) {
     discovery.stop();

@@ -30,6 +30,9 @@ class DiscoveryService {
     this.httpPort = null;
     this.isStreaming = false;
     this.streamPort = null;
+    this.classId = null;
+    this.className = null;
+    this.role = null;
     this.peers = new Map();
     this.socket = null;
     this.scanTimer = null;
@@ -99,18 +102,36 @@ class DiscoveryService {
       httpPort: this.httpPort,
       isStreaming: this.isStreaming,
       streamPort: this.streamPort,
+      classId: this.classId,
+      className: this.className,
+      role: this.role,
       isSelf: true,
     };
+  }
+
+  setRoleContext(role) {
+    this.role = role || null;
+    this.upsertPeer(this.getSelfPeer(), MSG_HELLO);
+  }
+
+  setClassContext({ classId, className } = {}) {
+    this.classId = classId || null;
+    this.className = className || null;
+    this.upsertPeer(this.getSelfPeer(), MSG_HELLO);
   }
 
   scan() {
     sendBroadcast(toDiscover());
   }
 
-  announceSource(httpPort) {
+  announceSource(httpPort, classMeta = {}) {
     this.refreshNetworkIdentity();
     this.isSource = true;
     this.httpPort = httpPort;
+    if (classMeta.classId) {
+      this.classId = classMeta.classId;
+      this.className = classMeta.className || null;
+    }
     this.upsertPeer(this.getSelfPeer(), MSG_SOURCE);
     this.broadcastSource(httpPort);
     this.startSourceAnnounceTimer(httpPort);
@@ -122,6 +143,8 @@ class DiscoveryService {
         hostname: this.hostname,
         ip: this.localIp,
         httpPort: httpPort || this.httpPort,
+        classId: this.classId,
+        className: this.className,
       })
     );
   }
@@ -227,6 +250,9 @@ class DiscoveryService {
         httpPort: peer.httpPort ?? existing.httpPort ?? null,
         isStreaming: Boolean(peer.isStreaming) || Boolean(existing.isStreaming),
         streamPort: peer.streamPort ?? existing.streamPort ?? null,
+        classId: peer.classId ?? existing.classId ?? null,
+        className: peer.className ?? existing.className ?? null,
+        role: peer.role ?? existing.role ?? null,
       };
     }
 

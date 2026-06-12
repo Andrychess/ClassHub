@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; img-src 'self' data: http: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+      content="default-src 'self'; img-src 'self' data: http: blob:; frame-src http:; style-src 'self' 'unsafe-inline'; script-src 'self'"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ClassHub</title>
@@ -18,7 +18,7 @@
           <img class="brand-icon" src="assets/logo.png" width="64" height="64" alt="ClassHub" />
           <div>
             <h1>ClassHub</h1>
-            <p class="subtitle">Локальная сеть учебной группы и раздача материалов</p>
+            <p class="subtitle">Локальная сеть учебной группы</p>
           </div>
         </div>
         <div class="local-info">
@@ -29,115 +29,355 @@
         </div>
       </header>
 
-      <section class="toolbar card">
-        <button id="btn-scan" class="btn primary">Обновить список</button>
-        <button id="btn-open" class="btn">Открыть в браузере</button>
-        <button id="btn-update" class="btn">Обновить с GitHub</button>
-        <span id="app-version" class="app-version muted"></span>
-        <span id="status" class="status">Загрузка...</span>
-      </section>
-
-      <section class="card peers-section">
-        <div class="section-title">
-          <h2>Устройства в сети</h2>
-          <span id="peer-count" class="badge">0</span>
-        </div>
-        <p class="hint">
-          Имена устройств запрашиваются по сети (DNS, NetBIOS, ping). Для ClassHub — имя компьютера Windows.
-          Телефоны часто показываются как «iPhone» или «Устройство IP».
-        </p>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Имя ПК</th>
-                <th>IP-адрес</th>
-                <th>Роль</th>
-                <th>Экран</th>
-                <th>Ссылка</th>
-              </tr>
-            </thead>
-            <tbody id="peers-body">
-              <tr class="empty-row">
-                <td colspan="5">Поиск компьютеров...</td>
-              </tr>
-            </tbody>
-          </table>
+      <section id="role-gate" class="card role-gate">
+        <h2>Кто использует этот компьютер?</h2>
+        <p class="hint">Выберите режим работы. Режим преподавателя защищён паролем.</p>
+        <div class="role-cards">
+          <button id="btn-role-student" class="role-card role-card-student" type="button">
+            <span class="role-card-title">Ученик</span>
+            <span class="role-card-desc">Рабочая страница класса, материалы и чат</span>
+          </button>
+          <button id="btn-role-teacher" class="role-card role-card-teacher" type="button">
+            <span class="role-card-title">Преподаватель</span>
+            <span class="role-card-desc">Рабочая страница и управление классом</span>
+          </button>
         </div>
       </section>
 
-      <section class="card source-section">
-        <h2>ПК-источник</h2>
-        <p class="hint">Выберите папку с образом, софтом или скриптами и запустите раздачу.</p>
-
-        <div class="folder-row">
-          <select id="folder-select" class="folder-select">
-            <option value="">Выберите сохранённую папку...</option>
-          </select>
-          <button id="btn-folder" class="btn">Добавить...</button>
-          <button id="btn-remove-folder" class="btn danger-outline" title="Удалить из списка">✕</button>
-        </div>
-        <p id="folder-path" class="folder-path muted">Папка не выбрана</p>
-
-        <div class="actions">
-          <button id="btn-source" class="btn success">Стать источником</button>
-          <button id="btn-stop" class="btn danger">Остановить раздачу</button>
-        </div>
-
-        <div id="source-link-box" class="source-link-box hidden">
-          <span class="label">Ссылка для учеников</span>
-          <div class="source-link-row">
-            <input id="source-link" type="text" readonly />
-            <button id="btn-copy-link" class="btn primary">Копировать</button>
-            <button id="btn-open-source" class="btn">Открыть</button>
+      <section id="teacher-auth" class="card teacher-auth hidden">
+        <h2>Вход для преподавателя</h2>
+        <p class="hint">Введите пароль, чтобы открыть панель управления классом.</p>
+        <form id="teacher-auth-form" class="teacher-auth-form">
+          <input
+            id="teacher-password"
+            class="teacher-password-input"
+            type="password"
+            placeholder="Пароль преподавателя"
+            autocomplete="off"
+          />
+          <div class="teacher-auth-actions">
+            <button id="btn-teacher-login" class="btn primary" type="submit">Войти</button>
+            <button id="btn-teacher-back" class="btn" type="button">Назад</button>
           </div>
-          <p class="hint source-link-hint">
-            Важно: только <strong>http://</strong>, не https. Порт <strong>:8765</strong> обязателен.
-            Если видите ERR_SSL_PROTOCOL_ERROR — в адресе случайно https или нет порта.
-          </p>
+          <p id="teacher-auth-error" class="teacher-auth-error hidden"></p>
+        </form>
+      </section>
+
+      <section id="student-class-gate" class="card student-class-gate hidden">
+        <h2>Выберите класс</h2>
+        <p class="hint">
+          Приложение ищет преподавателей в локальной сети и загружает список их классов с настройками.
+        </p>
+        <div class="class-picker-actions">
+          <button id="btn-class-scan" class="btn primary" type="button">Обновить список</button>
+          <button id="btn-class-back" class="btn" type="button">Назад</button>
+        </div>
+        <div id="class-picker-list" class="class-picker-list">
+          <div class="class-picker-empty muted">Поиск классов в сети...</div>
         </div>
       </section>
 
-      <section class="card stream-client-section">
-        <h2>Трансляция экрана</h2>
-        <p class="hint">
-          Ученик нажимает «Показать экран учителю». Учитель видит экран в блоке «Экраны класса» ниже.
-          Если экран не появился — нажмите «Обновить список» на обоих ПК. Нужен порт <strong>8766</strong> в брандмауэре.
-        </p>
-        <div class="actions">
-          <button id="btn-screen-start" class="btn primary">Показать экран учителю</button>
-          <button id="btn-screen-stop" class="btn danger">Остановить показ</button>
-        </div>
-        <div id="stream-link-box" class="source-link-box hidden">
-          <span class="label">Ссылка на трансляцию</span>
-          <div class="source-link-row">
-            <input id="stream-link" type="text" readonly />
-            <button id="btn-copy-stream" class="btn primary">Копировать</button>
-            <button id="btn-open-stream" class="btn">Открыть</button>
+      <section id="teacher-class-gate" class="card teacher-class-gate hidden">
+        <h2>Выберите класс</h2>
+        <p class="hint">Выберите класс для работы или создайте новый с настройками папки и программ.</p>
+
+        <div id="teacher-gate-list-view">
+          <div id="teacher-gate-class-list" class="class-picker-list">
+            <div class="class-picker-empty muted">Загрузка классов...</div>
           </div>
-          <p class="hint source-link-hint">
-            Учитель может открыть эту ссылку в браузере или нажать «Обновить список» в ClassHub.
-          </p>
+
+          <div class="class-picker-actions">
+            <button id="btn-teacher-gate-new" class="btn primary" type="button">Создать новый класс</button>
+            <button id="btn-teacher-gate-back" class="btn" type="button">Назад</button>
+          </div>
+        </div>
+
+        <div id="teacher-gate-form-view" class="teacher-gate-form hidden">
+          <h3 id="teacher-gate-form-title">Новый класс</h3>
+
+          <label class="label" for="teacher-gate-form-name">Название класса</label>
+          <input
+            id="teacher-gate-form-name"
+            class="class-name-input teacher-gate-form-name"
+            type="text"
+            placeholder="Например, 9А"
+            maxlength="80"
+          />
+
+          <div class="class-folder-row">
+            <div>
+              <span class="label">Папка с материалами</span>
+              <p id="teacher-gate-form-folder" class="folder-path muted">Папка не выбрана</p>
+            </div>
+            <button id="btn-teacher-gate-form-folder" class="btn" type="button">Выбрать папку</button>
+          </div>
+
+          <p class="hint">Отметьте программы по названию из меню «Пуск». На других компьютерах ClassHub найдёт их по имени, даже если ярлык лежит в другой папке.</p>
+          <div class="class-apps-shell">
+            <input
+              id="teacher-gate-apps-search"
+              class="class-apps-search"
+              type="search"
+              placeholder="Поиск приложений..."
+              autocomplete="off"
+            />
+            <div id="teacher-gate-form-apps" class="class-apps-list"></div>
+            <div id="teacher-gate-apps-empty" class="class-apps-empty hidden muted">Приложения не найдены</div>
+          </div>
+
+          <div class="actions">
+            <button id="btn-teacher-gate-form-save" class="btn success" type="button">Сохранить</button>
+            <button id="btn-teacher-gate-form-save-enter" class="btn primary" type="button">Сохранить и войти</button>
+            <button id="btn-teacher-gate-form-cancel" class="btn" type="button">Отмена</button>
+          </div>
         </div>
       </section>
 
-      <section class="card screens-section">
-        <div class="section-title">
-          <h2>Экраны класса</h2>
-          <span id="screen-count" class="badge">0</span>
+      <div id="app-content" class="hidden">
+        <section class="page-nav card">
+          <div class="page-nav-top">
+            <div id="role-badge" class="role-chip">—</div>
+
+            <nav class="page-tabs" aria-label="Разделы">
+              <button id="btn-page-workspace" class="page-tab active" type="button">Рабочая страница</button>
+              <button id="btn-page-class-settings" class="page-tab teacher-only" type="button">Настройки класса</button>
+              <button id="btn-page-broadcasts" class="page-tab teacher-only" type="button">Трансляции</button>
+              <button id="btn-page-network" class="page-tab teacher-only" type="button">Сеть</button>
+            </nav>
+
+            <div class="page-nav-actions">
+              <button id="btn-student-scan" class="btn btn-nav-action" type="button">Обновить материалы</button>
+              <button id="btn-screen-start" class="btn btn-nav-action primary student-only" type="button">Показать экран</button>
+              <button id="btn-screen-stop" class="btn btn-nav-action danger student-only hidden" type="button">Остановить</button>
+            </div>
+          </div>
+
+          <div class="page-nav-bottom">
+            <p id="status" class="page-status" title="">Готово к работе</p>
+            <div class="page-nav-meta">
+              <span id="app-version" class="meta-pill muted"></span>
+              <div class="page-nav-links">
+                <button id="btn-switch-class" class="btn-text hidden" type="button">Сменить класс</button>
+                <button id="btn-switch-role" class="btn-text" type="button">Сменить роль</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div id="workspace-page" class="workspace-page">
+          <div class="workspace-main">
+            <section class="card workspace-panel apps-panel">
+              <div class="panel-head apps-panel-head">
+                <h2>Программы</h2>
+                <input
+                  id="apps-search"
+                  class="apps-search"
+                  type="search"
+                  placeholder="Поиск..."
+                  autocomplete="off"
+                />
+              </div>
+              <div class="apps-scroll">
+                <div id="apps-grid" class="apps-grid">
+                  <div class="apps-empty muted">Загрузка списка программ...</div>
+                </div>
+              </div>
+            </section>
+
+            <section class="card workspace-panel source-panel">
+              <div class="panel-head source-panel-head">
+                <h2>Материалы</h2>
+                <select id="source-select" class="source-select hidden"></select>
+              </div>
+              <div class="source-viewport">
+                <div id="source-empty" class="source-empty muted">
+                  Материалы пока недоступны. Нажмите «Обновить материалы».
+                </div>
+                <iframe id="source-frame" class="source-frame hidden" title="Материалы класса"></iframe>
+              </div>
+            </section>
+          </div>
+
+          <aside class="card workspace-panel chat-sidebar">
+            <div class="section-title">
+              <h2>Чат класса</h2>
+              <span id="chat-count" class="badge">0</span>
+            </div>
+            <div id="chat-messages" class="chat-messages chat-messages-sidebar">
+              <div class="chat-empty muted">Пока нет сообщений. Напишите первым.</div>
+            </div>
+            <form id="chat-form" class="chat-form">
+              <input
+                id="chat-input"
+                class="chat-input"
+                type="text"
+                maxlength="2000"
+                placeholder="Сообщение..."
+                autocomplete="off"
+              />
+              <button id="btn-chat-send" class="btn primary" type="submit">Отправить</button>
+            </form>
+          </aside>
         </div>
-        <p class="hint">
-          Здесь отображаются экраны учеников, которые включили трансляцию.
-          Для проверки откройте в браузере: <strong>http://IP_ученика:8766/frame.jpg</strong>
-        </p>
-        <div id="screen-grid" class="screen-grid">
-          <div class="screen-empty muted">Пока никто не транслирует экран</div>
+
+        <div id="class-settings-page" class="teacher-page hidden teacher-only">
+          <section class="card classes-section">
+            <div class="section-title">
+              <h2>Настройки класса</h2>
+              <span id="classes-count" class="badge">0</span>
+            </div>
+            <p class="hint">
+              Выберите класс и настройте папку с материалами и список программ для учеников. Раздачу материалов запускайте на странице «Сеть».
+            </p>
+
+            <div class="class-form-row">
+              <button id="btn-class-new" class="btn primary" type="button">Создать класс</button>
+            </div>
+
+            <div id="classes-list" class="classes-list">
+              <div class="classes-empty muted">Классы ещё не созданы.</div>
+            </div>
+
+            <div id="class-editor" class="class-editor hidden">
+              <h3 id="class-editor-title">Настройка класса</h3>
+              <label class="label" for="class-editor-name">Название класса</label>
+              <input
+                id="class-editor-name"
+                class="class-name-input class-editor-name"
+                type="text"
+                placeholder="Например, 9А"
+                maxlength="80"
+              />
+              <div class="class-folder-row">
+                <div>
+                  <span class="label">Папка с материалами</span>
+                  <p id="class-editor-folder" class="folder-path muted">Папка не выбрана</p>
+                </div>
+                <button id="btn-class-folder" class="btn" type="button">Выбрать папку</button>
+              </div>
+              <div class="actions">
+                <button id="btn-class-save" class="btn success" type="button">Сохранить настройки</button>
+                <button id="btn-class-delete" class="btn danger" type="button">Удалить</button>
+              </div>
+              <p class="hint">Отметьте программы по названию из меню «Пуск». Если ничего не выбрано — ученики увидят все локальные программы. Отсутствующие на ПК ученика будут показаны серым.</p>
+              <div class="class-apps-shell">
+                <input
+                  id="class-apps-search"
+                  class="class-apps-search"
+                  type="search"
+                  placeholder="Поиск приложений..."
+                  autocomplete="off"
+                />
+                <div id="class-apps-list" class="class-apps-list"></div>
+                <div id="class-apps-empty" class="class-apps-empty hidden muted">Приложения не найдены</div>
+              </div>
+            </div>
+          </section>
         </div>
-      </section>
+
+        <div id="broadcasts-page" class="teacher-page hidden teacher-only">
+          <section class="card broadcasts-panel">
+            <div class="broadcasts-panel-head">
+              <div class="broadcasts-panel-intro">
+                <div class="section-title broadcasts-panel-title">
+                  <h2>Экраны класса</h2>
+                  <span id="screen-count" class="badge">0</span>
+                </div>
+                <p class="hint broadcasts-panel-hint">Нажмите на превью, чтобы открыть трансляцию в ClassHub.</p>
+              </div>
+
+              <div class="broadcasts-panel-tools">
+                <form id="watch-ip-form" class="watch-ip-inline">
+                  <input
+                    id="watch-ip-input"
+                    type="text"
+                    placeholder="IP вручную, например 192.168.0.17"
+                    autocomplete="off"
+                  />
+                  <button id="btn-watch-ip-add" class="btn" type="submit">Добавить</button>
+                </form>
+                <button
+                  id="btn-broadcasts-fullscreen"
+                  class="btn broadcasts-fullscreen-btn"
+                  type="button"
+                  aria-pressed="false"
+                >
+                  На весь экран
+                </button>
+              </div>
+            </div>
+
+            <div id="screen-grid" class="screen-grid">
+              <div class="screen-empty muted">Пока никто не транслирует экран</div>
+            </div>
+          </section>
+
+          <div id="stream-link-box" class="hidden">
+            <input id="stream-link" type="text" readonly hidden />
+          </div>
+        </div>
+
+        <div id="network-page" class="teacher-page hidden teacher-only">
+          <section class="toolbar card">
+            <button id="btn-scan" class="btn primary">Обновить список</button>
+            <button id="btn-open" class="btn">Открыть в браузере</button>
+            <button id="btn-update" class="btn">Обновить с GitHub</button>
+          </section>
+
+          <section class="card peers-section">
+            <div class="section-title">
+              <h2>Устройства в сети</h2>
+              <span id="peer-count" class="badge">0</span>
+            </div>
+            <p class="hint">Список компьютеров в локальной сети. «В эфире» — ученик транслирует экран.</p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Имя ПК</th>
+                    <th>IP-адрес</th>
+                    <th>Роль</th>
+                    <th>Экран</th>
+                    <th>Ссылка</th>
+                  </tr>
+                </thead>
+                <tbody id="peers-body">
+                  <tr class="empty-row">
+                    <td colspan="5">Поиск компьютеров...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="card source-section">
+            <h2>Раздача материалов</h2>
+            <p class="hint">Раздача запускается автоматически при входе в класс. Здесь можно остановить её или скопировать ссылку для учеников.</p>
+
+            <p id="sharing-class-label" class="sharing-class-label muted">Активный класс не выбран</p>
+
+            <div class="actions">
+              <button id="btn-source" class="btn success">Запустить раздачу класса</button>
+              <button id="btn-stop" class="btn danger">Остановить раздачу</button>
+            </div>
+
+            <div id="source-link-box" class="source-link-box hidden">
+              <span class="label">Ссылка для учеников</span>
+              <div class="source-link-row">
+                <input id="source-link" type="text" readonly />
+                <button id="btn-copy-link" class="btn primary">Копировать</button>
+                <button id="btn-open-source" class="btn">Открыть</button>
+              </div>
+              <p class="hint source-link-hint">Только <strong>http://</strong>, порт <strong>:8765</strong>.</p>
+            </div>
+          </section>
+        </div>
+      </div>
     </div>
 
     <script src="shared/dom.js"></script>
     <script src="shared/urls.js"></script>
+    <script src="shared/apps.js"></script>
     <script src="renderer.js"></script>
   </body>
 </html>

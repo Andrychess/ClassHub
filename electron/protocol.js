@@ -4,7 +4,11 @@ const { DISCOVERY_PORT } = require("./constants");
 
 const PORT = DISCOVERY_PORT;
 const MAGIC = "MEGACLEANER";
-const VERSION = "2";
+const VERSION = "4";
+
+const ROLE_NONE = "0";
+const ROLE_TEACHER = "1";
+const ROLE_STUDENT = "2";
 
 const MSG_DISCOVER = "DISCOVER";
 const MSG_HELLO = "HELLO";
@@ -111,6 +115,9 @@ function buildPeer(parts) {
     httpPort: null,
     isStreaming: false,
     streamPort: null,
+    classId: null,
+    className: null,
+    role: null,
   };
 
   if (msgType === MSG_HELLO && parts.length >= 7) {
@@ -120,6 +127,9 @@ function buildPeer(parts) {
       httpPort: parts[6] !== "0" ? Number(parts[6]) : null,
       isStreaming: parts[7] === "1",
       streamPort: parts[8] && parts[8] !== "0" ? Number(parts[8]) : null,
+      classId: parts[9] && parts[9] !== "0" ? parts[9] : null,
+      className: parts[10] && parts[10] !== "0" ? decodeURIComponent(parts[10]) : null,
+      role: decodeRole(parts[11]),
     };
   }
 
@@ -128,6 +138,8 @@ function buildPeer(parts) {
       ...base,
       isSource: true,
       httpPort: parts[5] !== "0" ? Number(parts[5]) : null,
+      classId: parts[6] && parts[6] !== "0" ? parts[6] : null,
+      className: parts[7] && parts[7] !== "0" ? decodeURIComponent(parts[7]) : null,
     };
   }
 
@@ -167,7 +179,27 @@ function parseMessage(data) {
   return { type: parts[2], peer: parsePeer(text) };
 }
 
-function toHello({ hostname, ip, isSource, httpPort, isStreaming, streamPort }) {
+function decodeRole(value) {
+  if (value === ROLE_TEACHER) {
+    return "teacher";
+  }
+  if (value === ROLE_STUDENT) {
+    return "student";
+  }
+  return null;
+}
+
+function encodeRole(role) {
+  if (role === "teacher") {
+    return ROLE_TEACHER;
+  }
+  if (role === "student") {
+    return ROLE_STUDENT;
+  }
+  return ROLE_NONE;
+}
+
+function toHello({ hostname, ip, isSource, httpPort, isStreaming, streamPort, classId, className, role }) {
   return [
     MAGIC,
     VERSION,
@@ -178,11 +210,23 @@ function toHello({ hostname, ip, isSource, httpPort, isStreaming, streamPort }) 
     String(httpPort || 0),
     isStreaming ? "1" : "0",
     String(streamPort || 0),
+    classId || "0",
+    className ? encodeURIComponent(className) : "0",
+    encodeRole(role),
   ].join("|");
 }
 
-function toSource({ hostname, ip, httpPort }) {
-  return `${MAGIC}|${VERSION}|${MSG_SOURCE}|${hostname}|${ip}|${httpPort || 0}`;
+function toSource({ hostname, ip, httpPort, classId, className }) {
+  return [
+    MAGIC,
+    VERSION,
+    MSG_SOURCE,
+    hostname,
+    ip,
+    String(httpPort || 0),
+    classId || "0",
+    className ? encodeURIComponent(className) : "0",
+  ].join("|");
 }
 
 function toScreen({ hostname, ip, streamPort }) {
@@ -245,6 +289,11 @@ module.exports = {
   getUniqueSubnets,
   getHostname,
   parseMessage,
+  ROLE_NONE,
+  ROLE_TEACHER,
+  ROLE_STUDENT,
+  decodeRole,
+  encodeRole,
   toHello,
   toSource,
   toScreen,

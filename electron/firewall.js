@@ -3,6 +3,7 @@ const {
   DISCOVERY_PORT,
   FILE_SERVER_PORT,
   SCREEN_SERVER_PORT,
+  CHAT_SERVER_PORT,
 } = require("./constants");
 
 function tryAddFirewallRule({ name, protocol, port, failureMessage, successMessage }) {
@@ -54,6 +55,11 @@ async function ensureClassHubFirewallRules() {
     protocol: "TCP",
     port: SCREEN_SERVER_PORT,
   });
+  await tryAddFirewallRule({
+    name: "ClassHub Chat TCP",
+    protocol: "TCP",
+    port: CHAT_SERVER_PORT,
+  });
 }
 
 function tryAddHttpFirewallRule(port = FILE_SERVER_PORT) {
@@ -77,8 +83,19 @@ function tryAddScreenFirewallRule(port = SCREEN_SERVER_PORT) {
   });
 }
 
+function tryAddChatFirewallRule(port = CHAT_SERVER_PORT) {
+  return tryAddFirewallRule({
+    name: `ClassHub Chat ${port}`,
+    protocol: "TCP",
+    port,
+    failureMessage: "Не удалось открыть порт чата в брандмауэре.",
+    successMessage: `Порт чата ${port} открыт`,
+  });
+}
+
 module.exports = {
   ensureClassHubFirewallRules,
   tryAddHttpFirewallRule,
   tryAddScreenFirewallRule,
+  tryAddChatFirewallRule,
 };

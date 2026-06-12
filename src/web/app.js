@@ -177,8 +177,14 @@ searchInput.addEventListener("input", () => {
 });
 
 async function init() {
+  const isEmbedded =
+    window.top !== window.self || new URLSearchParams(window.location.search).get("embed") === "1";
+  document.documentElement.classList.toggle("embedded", isEmbedded);
+
   try {
-    await loadInfo();
+    if (!isEmbedded) {
+      await loadInfo();
+    }
     await loadDirectory("");
   } catch (error) {
     setState(error.message || "Сервер недоступен", true);
