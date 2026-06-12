@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld("classHub", {
   stopScreenShare: () => ipcRenderer.invoke("stop-screen-share"),
   openUrl: (url) => ipcRenderer.invoke("open-url", url),
   copyToClipboard: (text) => ipcRenderer.invoke("copy-to-clipboard", text),
+  checkUpdates: () => ipcRenderer.invoke("check-updates"),
+  getAppVersion: () => ipcRenderer.invoke("get-app-version"),
   onPeersUpdated: (callback) => {
     const listener = (_event, peers) => callback(peers);
     ipcRenderer.on("peers-updated", listener);

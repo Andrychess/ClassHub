@@ -120,6 +120,11 @@ h2 {
   font-size: 14px;
 }
 
+.app-version {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .section-title {
   display: flex;
   align-items: center;

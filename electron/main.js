@@ -13,6 +13,7 @@ const {
   getFolderState,
 } = require("./settings");
 const { ensureClassHubFirewallRules } = require("./firewall");
+const { checkForUpdates, setStatusHandler } = require("./updater");
 
 let mainWindow = null;
 let captureWindow = null;
@@ -160,6 +161,7 @@ async function scanNetworkDevices() {
 }
 
 app.whenReady().then(async () => {
+  setStatusHandler(sendStatus);
   await ensureClassHubFirewallRules();
   const folderState = getFolderState();
   shareFolder = folderState.lastSelectedFolder;
@@ -355,12 +357,6 @@ ipcMain.handle("open-url", async (_event, url) => {
   }
 });
 
-ipcMain.handle("copy-to-clipboard", (_event, text) => {
-  const { clipboard } = require("electron");
-  clipboard.writeText(normalizeHttpUrl(text));
-  return { ok: true };
-});
-
 function normalizeHttpUrl(url) {
   let value = String(url || "").trim();
   if (!value) {
@@ -377,3 +373,20 @@ function normalizeHttpUrl(url) {
 
   return value;
 }
+
+ipcMain.handle("copy-to-clipboard", (_event, text) => {
+  const { clipboard } = require("electron");
+  clipboard.writeText(normalizeHttpUrl(text));
+  return { ok: true };
+});
+
+ipcMain.handle("check-updates", async () => {
+  sendStatus("Проверка обновлений на GitHub...");
+  const result = await checkForUpdates(mainWindow);
+  if (result.message) {
+    sendStatus(result.message);
+  }
+  return result;
+});
+
+ipcMain.handle("get-app-version", () => app.getVersion());

@@ -10,6 +10,7 @@ const folderSelect = document.getElementById("folder-select");
 const folderPath = document.getElementById("folder-path");
 const sourceLinkBox = document.getElementById("source-link-box");
 const sourceLinkInput = document.getElementById("source-link");
+const appVersionEl = document.getElementById("app-version");
 
 let peers = [];
 let selectedIp = null;
@@ -171,6 +172,10 @@ function updateSourceLinkBox(sourceUrl, isSource) {
 
 async function loadState() {
   const state = await window.classHub.getState();
+  const version = await window.classHub.getAppVersion();
+  if (appVersionEl) {
+    appVersionEl.textContent = `v${version}`;
+  }
   localName.textContent = state.hostname;
   localIp.textContent = state.localIp;
 
@@ -297,6 +302,19 @@ document.getElementById("btn-open").addEventListener("click", async () => {
     return;
   }
   await window.classHub.openUrl(`http://${peer.ip}:${peer.httpPort}/`);
+});
+
+document.getElementById("btn-update").addEventListener("click", async () => {
+  const updateButton = document.getElementById("btn-update");
+  updateButton.disabled = true;
+  try {
+    const result = await window.classHub.checkUpdates();
+    if (result.message) {
+      setStatus(result.message);
+    }
+  } finally {
+    updateButton.disabled = false;
+  }
 });
 
 document.getElementById("btn-copy-link").addEventListener("click", async () => {
