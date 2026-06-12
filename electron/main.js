@@ -7,7 +7,7 @@ const { ScreenServer } = require("./screenServer");
 const { ChatServer } = require("./chatServer");
 const { postChatMessage } = require("./chatDelivery");
 const { scanLocalNetwork, mergePeerLists } = require("./networkScan");
-const { probeHttpSource, probeHttpStream, buildServiceHint } = require("./sourceProbe");
+const { probeHttpSource, probeHttpStream, probeChatServer, buildServiceHint } = require("./sourceProbe");
 const { getLocalIp, getHostname } = require("./protocol");
 const { syncFolderState } = require("./settings");
 const {
@@ -389,11 +389,12 @@ async function refreshServiceHints() {
 
     await Promise.all(
       Array.from(ips).map(async (ip) => {
-        const [source, stream] = await Promise.all([
+        const [source, stream, chat] = await Promise.all([
           probeHttpSource(ip, FILE_SERVER_PORT, 800),
           probeHttpStream(ip, SCREEN_SERVER_PORT, 800),
+          probeChatServer(ip, undefined, 800),
         ]);
-        const hint = buildServiceHint(source, stream);
+        const hint = buildServiceHint(source, stream, chat);
         if (hint) {
           nextHints.set(ip, hint);
         }

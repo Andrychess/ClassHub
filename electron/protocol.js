@@ -102,6 +102,25 @@ function getBroadcastAddress() {
   return "255.255.255.255";
 }
 
+function getSubnetPrefix(ip) {
+  const parts = String(ip || "").split(".");
+  if (parts.length !== 4) {
+    return null;
+  }
+
+  return `${parts[0]}.${parts[1]}.${parts[2]}`;
+}
+
+function getBestLocalIpForPeer(remoteIp) {
+  const remotePrefix = getSubnetPrefix(remoteIp);
+  if (!remotePrefix) {
+    return getLocalIp();
+  }
+
+  const match = getPhysicalNetworkInterfaces().find((item) => item.prefix === remotePrefix);
+  return match?.address || getLocalIp();
+}
+
 function getHostname() {
   return os.hostname();
 }
@@ -245,31 +264,40 @@ function toStopScreen() {
   return `${MAGIC}|${VERSION}|${MSG_SCREEN_STOP}|${getHostname()}|${getLocalIp()}`;
 }
 
-function sendBroadcast(payload) {
+function sendToInterface(iface, payload) {
   const message = Buffer.from(payload, "utf8");
+  const socket = dgram.createSocket("udp4");
+  socket.on("error", () => {
+    socket.close();
+  });
+  socket.bind({ address: iface.address || "0.0.0.0", port: 0 }, () => {
+    socket.setBroadcast(true);
+    socket.send(message, PORT, iface.broadcast || getBroadcastAddress(), () => {});
+    socket.close();
+  });
+}
+
+function sendBroadcast(payload) {
   const interfaces = getPhysicalNetworkInterfaces();
-  const targets = new Set(["255.255.255.255"]);
+  if (!interfaces.length) {
+    sendToInterface({ address: "0.0.0.0", broadcast: getBroadcastAddress() }, payload);
+    return;
+  }
 
   for (const iface of interfaces) {
-    targets.add(iface.broadcast);
+    sendToInterface(iface, payload);
   }
+}
 
+function sendBroadcastPerInterface(buildPayload) {
+  const interfaces = getPhysicalNetworkInterfaces();
   if (!interfaces.length) {
-    targets.add(getBroadcastAddress());
+    sendBroadcast(buildPayload(getLocalIp()));
+    return;
   }
 
-  for (const iface of interfaces.length ? interfaces : [{ address: "0.0.0.0" }]) {
-    const socket = dgram.createSocket("udp4");
-    socket.on("error", () => {
-      socket.close();
-    });
-    socket.bind({ address: iface.address || "0.0.0.0", port: 0 }, () => {
-      socket.setBroadcast(true);
-      for (const target of targets) {
-        socket.send(message, PORT, target, () => {});
-      }
-      socket.close();
-    });
+  for (const iface of interfaces) {
+    sendToInterface(iface, buildPayload(iface.address));
   }
 }
 
@@ -284,6 +312,7 @@ module.exports = {
   getNetworkInterfaces,
   getPhysicalNetworkInterfaces,
   getLocalIp,
+  getBestLocalIpForPeer,
   getAllLocalIps,
   isLocalIp,
   getUniqueSubnets,
@@ -301,4 +330,5 @@ module.exports = {
   toStopSource,
   toStopScreen,
   sendBroadcast,
+  sendBroadcastPerInterface,
 };

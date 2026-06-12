@@ -11,6 +11,7 @@ const {
   MSG_STOP_SOURCE,
   getLocalIp,
   getHostname,
+  getBestLocalIpForPeer,
   isLocalIp,
   parseMessage,
   toHello,
@@ -20,6 +21,7 @@ const {
   toStopScreen,
   toDiscover,
   sendBroadcast,
+  sendBroadcastPerInterface,
 } = require("./protocol");
 
 class DiscoveryService {
@@ -160,6 +162,7 @@ class DiscoveryService {
   setRoleContext(role) {
     this.role = role || null;
     this.upsertPeer(this.getSelfPeer(), MSG_HELLO);
+    sendBroadcastPerInterface((localIp) => toHello({ ...this.getSelfPeer(), ip: localIp }));
   }
 
   setClassContext({ classId, className } = {}) {
@@ -186,10 +189,10 @@ class DiscoveryService {
   }
 
   broadcastSource(httpPort) {
-    sendBroadcast(
+    sendBroadcastPerInterface((localIp) =>
       toSource({
         hostname: this.hostname,
-        ip: this.localIp,
+        ip: localIp,
         httpPort: httpPort || this.httpPort,
         classId: this.classId,
         className: this.className,
@@ -234,10 +237,10 @@ class DiscoveryService {
   }
 
   broadcastScreen(streamPort) {
-    sendBroadcast(
+    sendBroadcastPerInterface((localIp) =>
       toScreen({
         hostname: this.hostname,
-        ip: this.localIp,
+        ip: localIp,
         streamPort: streamPort || this.streamPort,
       })
     );
@@ -276,7 +279,8 @@ class DiscoveryService {
     }
 
     this.refreshNetworkIdentity();
-    const payload = toHello(this.getSelfPeer());
+    const localIp = getBestLocalIpForPeer(targetIp);
+    const payload = toHello({ ...this.getSelfPeer(), ip: localIp });
     this.socket.send(Buffer.from(payload, "utf8"), PORT, targetIp, () => {});
   }
 

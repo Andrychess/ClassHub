@@ -2,7 +2,7 @@ const http = require("http");
 const path = require("path");
 const { CHAT_SERVER_PORT } = require("./constants");
 
-const TEACHER_DISCOVERY_WAIT_MS = 1800;
+const TEACHER_DISCOVERY_WAIT_MS = 2500;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -55,10 +55,6 @@ function collectTeacherCandidateIps(peers) {
 
   for (const peer of peers || []) {
     if (!peer?.ip || peer.isSelf) {
-      continue;
-    }
-
-    if (peer.isNetworkDevice && !peer.hasClassHub) {
       continue;
     }
 

@@ -4,6 +4,16 @@ const { tryAddChatFirewallRule } = require("./firewall");
 const { listenOn, closeServer } = require("./serverUtils");
 const { getLocalIp, getHostname } = require("./protocol");
 
+function getReachableLocalIp(req) {
+  const raw = req?.socket?.localAddress || "";
+  const normalized = raw.replace(/^::ffff:/, "");
+  if (!normalized || normalized === "0.0.0.0" || normalized === "::") {
+    return getLocalIp();
+  }
+
+  return normalized;
+}
+
 class ChatServer {
   constructor() {
     this.port = CHAT_SERVER_PORT;
@@ -66,16 +76,16 @@ class ChatServer {
     const app = express();
     app.use(express.json({ limit: "16kb" }));
 
-    app.get("/api/chat/status", (_req, res) => {
+    app.get("/api/chat/status", (req, res) => {
       res.json({
         ok: true,
         hostname: getHostname(),
-        ip: getLocalIp(),
+        ip: getReachableLocalIp(req),
         port: this.port,
       });
     });
 
-    app.get("/api/teacher/classes", (_req, res) => {
+    app.get("/api/teacher/classes", (req, res) => {
       const payload =
         typeof this.getTeacherPayload === "function" ? this.getTeacherPayload() : null;
 
@@ -87,7 +97,7 @@ class ChatServer {
       res.json({
         ...payload,
         hostname: getHostname(),
-        ip: getLocalIp(),
+        ip: getReachableLocalIp(req),
       });
     });
 

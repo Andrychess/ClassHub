@@ -1,5 +1,5 @@
 const http = require("http");
-const { FILE_SERVER_PORT, SCREEN_SERVER_PORT } = require("./constants");
+const { FILE_SERVER_PORT, SCREEN_SERVER_PORT, CHAT_SERVER_PORT } = require("./constants");
 
 function probeHttpSource(ip, port = FILE_SERVER_PORT, timeoutMs = 1200) {
   return new Promise((resolve) => {
@@ -123,6 +123,48 @@ async function probeHttpStream(ip, port = SCREEN_SERVER_PORT, timeoutMs = 1200) 
   return probeStreamHeaders(ip, port, timeoutMs);
 }
 
+function probeChatServer(ip, port = CHAT_SERVER_PORT, timeoutMs = 1200) {
+  return new Promise((resolve) => {
+    const request = http.get(`http://${ip}:${port}/api/chat/status`, { timeout: timeoutMs }, (response) => {
+      let body = "";
+      response.on("data", (chunk) => {
+        body += chunk;
+      });
+      response.on("end", () => {
+        if (response.statusCode !== 200) {
+          resolve(null);
+          return;
+        }
+
+        try {
+          const info = JSON.parse(body);
+          if (!info.ok) {
+            resolve(null);
+            return;
+          }
+
+          resolve({
+            hostname: info.hostname || null,
+            ip: info.ip || ip,
+            hasClassHub: true,
+          });
+        } catch {
+          resolve({
+            ip,
+            hasClassHub: true,
+          });
+        }
+      });
+    });
+
+    request.on("error", () => resolve(null));
+    request.on("timeout", () => {
+      request.destroy();
+      resolve(null);
+    });
+  });
+}
+
 async function enrichDevicesWithNetworkServices(devices, batchSize = 16) {
   const enriched = [];
 
@@ -130,19 +172,20 @@ async function enrichDevicesWithNetworkServices(devices, batchSize = 16) {
     const batch = devices.slice(index, index + batchSize);
     const results = await Promise.all(
       batch.map(async (device) => {
-        const [source, stream] = await Promise.all([
+        const [source, stream, chat] = await Promise.all([
           probeHttpSource(device.ip),
           probeHttpStream(device.ip),
+          probeChatServer(device.ip),
         ]);
 
-        if (!source && !stream) {
+        if (!source && !stream && !chat) {
           return device;
         }
 
         return {
           ...device,
-          ...buildServiceHint(source, stream),
-          hostname: source?.hostname || stream?.hostname || device.hostname,
+          ...buildServiceHint(source, stream, chat),
+          hostname: source?.hostname || stream?.hostname || chat?.hostname || device.hostname,
           detectedViaHttp: true,
         };
       })
@@ -153,8 +196,8 @@ async function enrichDevicesWithNetworkServices(devices, batchSize = 16) {
   return enriched;
 }
 
-function buildServiceHint(source, stream) {
-  if (!source && !stream) {
+function buildServiceHint(source, stream, chat) {
+  if (!source && !stream && !chat) {
     return null;
   }
 
@@ -164,7 +207,7 @@ function buildServiceHint(source, stream) {
     httpPort: source?.httpPort || null,
     isStreaming: Boolean(stream),
     streamPort: stream?.streamPort || null,
-    hostname: source?.hostname || stream?.hostname || null,
+    hostname: source?.hostname || stream?.hostname || chat?.hostname || null,
     classId: source?.classId || null,
     className: source?.className || null,
   };
@@ -173,6 +216,7 @@ function buildServiceHint(source, stream) {
 module.exports = {
   probeHttpSource,
   probeHttpStream,
+  probeChatServer,
   enrichDevicesWithNetworkServices,
   buildServiceHint,
 };
