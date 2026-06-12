@@ -6,8 +6,6 @@ const statusEl = document.getElementById("status");
 const localName = document.getElementById("local-name");
 const localIp = document.getElementById("local-ip");
 const localNetworks = document.getElementById("local-networks");
-const folderSelect = document.getElementById("folder-select");
-const folderPath = document.getElementById("folder-path");
 const studentClassGate = document.getElementById("student-class-gate");
 const classPickerList = document.getElementById("class-picker-list");
 const teacherClassGate = document.getElementById("teacher-class-gate");
@@ -25,6 +23,7 @@ const btnSwitchClass = document.getElementById("btn-switch-class");
 const classesListEl = document.getElementById("classes-list");
 const classesCountEl = document.getElementById("classes-count");
 const classEditor = document.getElementById("class-editor");
+const classEditorPlaceholder = document.getElementById("class-editor-placeholder");
 const classEditorTitle = document.getElementById("class-editor-title");
 const classEditorFolder = document.getElementById("class-editor-folder");
 const classAppsList = document.getElementById("class-apps-list");
@@ -94,18 +93,22 @@ let peers = [];
 let lastAppState = null;
 let chatMessages = [];
 let selectedIp = null;
-let shareFolder = null;
-let savedFolders = [];
 let activeSourceUrl = null;
 let activeStreamUrl = null;
 let manualWatchIps = [];
-let screenRefreshTimers = [];
+let classPickerRefreshTimer = null;
 
-function clearScreenRefreshTimers() {
-  for (const timerId of screenRefreshTimers) {
-    clearInterval(timerId);
+function confirmAction(message) {
+  return window.confirm(message);
+}
+
+function filterChatForLocalClass(messages) {
+  const localClassId = getLocalClassId();
+  if (!localClassId) {
+    return messages || [];
   }
-  screenRefreshTimers = [];
+
+  return (messages || []).filter((message) => message.classId === localClassId);
 }
 
 function setStatus(message) {
@@ -152,6 +155,10 @@ function showPage(page) {
   btnPageClassSettings?.classList.toggle("active", page === "class-settings");
   btnPageBroadcasts?.classList.toggle("active", page === "broadcasts");
   btnPageNetwork?.classList.toggle("active", page === "network");
+
+  const isAdminPage = page === "class-settings" || page === "network";
+  appContent?.classList.toggle("is-admin-view", isAdminPage);
+  appContent?.classList.toggle("is-lesson-view", !isAdminPage);
 }
 
 function setBroadcastsFullscreen(enabled) {
@@ -662,13 +669,15 @@ function applyClassConfigFromCatalog(classId, teacherIp) {
   return true;
 }
 
-async function renderClassPicker() {
+async function renderClassPicker(options = {}) {
   if (!classPickerList) {
     return;
   }
 
-  classPickerList.innerHTML =
-    '<div class="class-picker-empty muted">Поиск преподавателей в локальной сети...</div>';
+  if (!options.quiet) {
+    classPickerList.innerHTML =
+      '<div class="class-picker-empty muted class-picker-loading">Поиск преподавателей в локальной сети...</div>';
+  }
 
   const result = await window.classHub.discoverTeacherClasses();
   discoveredClassCatalog = result.classes || [];
@@ -767,7 +776,7 @@ function renderClassesUi(state) {
 
   if (!classes.length) {
     classesListEl.innerHTML = '<div class="classes-empty muted">Классы ещё не созданы.</div>';
-    classEditor?.classList.add("hidden");
+    updateClassEditorVisibility(false);
     sharingClassLabel.textContent = "Активный класс не выбран";
     return;
   }
@@ -811,6 +820,11 @@ function renderClassesUi(state) {
   renderClassEditor();
 }
 
+function updateClassEditorVisibility(showEditor) {
+  classEditor?.classList.toggle("hidden", !showEditor);
+  classEditorPlaceholder?.classList.toggle("hidden", showEditor);
+}
+
 async function renderClassEditor() {
   if (!classEditor) {
     return;
@@ -820,11 +834,11 @@ async function renderClassEditor() {
   const classItem = isNew ? null : classes.find((item) => item.id === editingClassId);
 
   if (!isNew && !classItem) {
-    classEditor.classList.add("hidden");
+    updateClassEditorVisibility(false);
     return;
   }
 
-  classEditor.classList.remove("hidden");
+  updateClassEditorVisibility(true);
   classEditorTitle.textContent = isNew ? "Новый класс" : `Настройка: ${classItem.name}`;
   classEditorNameInput.value = isNew ? "" : classItem.name;
 
@@ -1165,25 +1179,29 @@ function applyRoleVisibility() {
 }
 
 function showRoleGate() {
-  currentRole = null;
-  currentPage = "workspace";
-  selectedSourceUrl = null;
-  joinedClass = null;
-  studentVisibleApps = [];
-  discoveredClassCatalog = [];
-  document.body.dataset.role = "";
-  window.classHub.setAppRole(null);
-  window.classHub.stopSource().catch(() => {});
-  window.classHub.stopScreenShare().catch(() => {});
-  roleGate?.classList.remove("hidden");
-  teacherAuth?.classList.add("hidden");
-  studentClassGate?.classList.add("hidden");
-  teacherClassGate?.classList.add("hidden");
-  appContent?.classList.add("hidden");
-  if (teacherPasswordInput) {
-    teacherPasswordInput.value = "";
-  }
-  hideTeacherAuthError();
+  const leavePromise = joinedClass ? window.classHub.leaveClass().catch(() => {}) : Promise.resolve();
+
+  leavePromise.finally(() => {
+    currentRole = null;
+    currentPage = "workspace";
+    selectedSourceUrl = null;
+    joinedClass = null;
+    studentVisibleApps = [];
+    discoveredClassCatalog = [];
+    document.body.dataset.role = "";
+    window.classHub.setAppRole(null);
+    window.classHub.stopSource().catch(() => {});
+    window.classHub.stopScreenShare().catch(() => {});
+    roleGate?.classList.remove("hidden");
+    teacherAuth?.classList.add("hidden");
+    studentClassGate?.classList.add("hidden");
+    teacherClassGate?.classList.add("hidden");
+    appContent?.classList.add("hidden");
+    if (teacherPasswordInput) {
+      teacherPasswordInput.value = "";
+    }
+    hideTeacherAuthError();
+  });
 }
 
 function showTeacherAuth() {
@@ -1288,7 +1306,7 @@ function appendChatMessage(message) {
   }
 
   const localClassId = getLocalClassId();
-  if (localClassId && message.classId && message.classId !== localClassId) {
+  if (localClassId && message.classId !== localClassId) {
     return;
   }
 
@@ -1500,7 +1518,6 @@ function renderScreenGrid(list) {
     return;
   }
 
-  clearScreenRefreshTimers();
   const streaming = buildWatchEntries(list);
   screenCount.textContent = String(streaming.length);
 
@@ -1576,35 +1593,6 @@ function renderScreenGrid(list) {
   });
 }
 
-function folderLabel(folder) {
-  const parts = folder.replace(/\\/g, "/").split("/").filter(Boolean);
-  return parts[parts.length - 1] || folder;
-}
-
-function updateFolderUi() {
-  if (!folderSelect || !folderPath) {
-    return;
-  }
-
-  folderSelect.innerHTML = '<option value="">Выберите сохранённую папку...</option>';
-  for (const folder of savedFolders) {
-    const option = document.createElement("option");
-    option.value = folder;
-    option.textContent = folderLabel(folder);
-    option.title = folder;
-    folderSelect.appendChild(option);
-  }
-
-  folderSelect.value = shareFolder || "";
-  folderPath.textContent = shareFolder || "Папка не выбрана";
-}
-
-function applyFolderState(nextShareFolder, nextSavedFolders) {
-  shareFolder = nextShareFolder || null;
-  savedFolders = nextSavedFolders || [];
-  updateFolderUi();
-}
-
 function getSelectedPeer() {
   return peers.find((peer) => peer.ip === selectedIp) || null;
 }
@@ -1663,14 +1651,11 @@ function updateSourceLinkBox(sourceUrl, isSource) {
 
 async function refreshState(options = {}) {
   const state = await window.classHub.getState();
-  if (options.updateFolders !== false && isTeacherRole()) {
-    applyFolderState(state.shareFolder, state.savedFolders);
-  }
   if (options.updatePeers !== false) {
     renderPeers(state.peers, state);
   }
   if (options.updateChat !== false) {
-    chatMessages = state.chatMessages || [];
+    chatMessages = filterChatForLocalClass(state.chatMessages || []);
     renderChatMessages();
   }
   setStatus(buildStatusMessage(state));
@@ -1715,11 +1700,8 @@ async function loadAppState() {
   const state = await window.classHub.getState();
   lastAppState = state;
   applyClassState(state);
-  if (isTeacherRole()) {
-    applyFolderState(state.shareFolder, state.savedFolders);
-  }
   renderPeers(state.peers, state);
-  chatMessages = state.chatMessages || [];
+  chatMessages = filterChatForLocalClass(state.chatMessages || []);
   renderChatMessages();
   setStatus(buildStatusMessage(state));
 }
@@ -1739,44 +1721,6 @@ document.getElementById("btn-scan").addEventListener("click", async () => {
   const state = await window.classHub.getState();
   lastAppState = state;
   renderPeers(list, state);
-});
-
-document.getElementById("btn-folder")?.addEventListener("click", async () => {
-  const folder = await window.classHub.pickFolder();
-  if (!folder) {
-    return;
-  }
-  const state = await window.classHub.getState();
-  applyFolderState(folder, state.savedFolders);
-});
-
-folderSelect?.addEventListener("change", async () => {
-  const folder = folderSelect.value;
-  if (!folder) {
-    shareFolder = null;
-    folderPath.textContent = "Папка не выбрана";
-    return;
-  }
-
-  const result = await window.classHub.selectFolder(folder);
-  if (!result.ok) {
-    setStatus(result.message);
-    await loadAppState();
-    return;
-  }
-
-  applyFolderState(result.shareFolder, result.savedFolders);
-});
-
-document.getElementById("btn-remove-folder")?.addEventListener("click", async () => {
-  if (!shareFolder) {
-    setStatus("Сначала выберите папку для удаления из списка.");
-    return;
-  }
-
-  const result = await window.classHub.removeSavedFolder(shareFolder);
-  applyFolderState(result.shareFolder, result.savedFolders);
-  setStatus("Папка удалена из списка.");
 });
 
 document.getElementById("btn-source")?.addEventListener("click", () =>
@@ -1914,7 +1858,22 @@ teacherAuthForm?.addEventListener("submit", async (event) => {
   await enterTeacherMode();
 });
 
-document.getElementById("btn-switch-role")?.addEventListener("click", () => {
+document.getElementById("btn-switch-role")?.addEventListener("click", async () => {
+  const state = lastAppState || (await window.classHub.getState());
+  let message = "Сменить роль? Текущая сессия будет завершена.";
+
+  if (state.isSource) {
+    message = "Активна раздача материалов. Сменить роль и остановить раздачу?";
+  } else if (state.isScreenSharing) {
+    message = "Экран транслируется. Сменить роль и остановить трансляцию?";
+  } else if (isStudentRole() && joinedClass) {
+    message = `Выйти из класса «${joinedClass.className}» и сменить роль?`;
+  }
+
+  if (!confirmAction(message)) {
+    return;
+  }
+
   showRoleGate();
 });
 
@@ -1980,7 +1939,18 @@ document.getElementById("btn-class-back")?.addEventListener("click", () => {
 });
 
 document.getElementById("btn-class-scan")?.addEventListener("click", async () => {
-  await renderClassPicker();
+  const scanButton = document.getElementById("btn-class-scan");
+  if (scanButton) {
+    scanButton.disabled = true;
+  }
+
+  try {
+    await renderClassPicker();
+  } finally {
+    if (scanButton) {
+      scanButton.disabled = false;
+    }
+  }
 });
 
 document.getElementById("btn-class-new")?.addEventListener("click", async () => {
@@ -2075,7 +2045,15 @@ document.getElementById("btn-class-save")?.addEventListener("click", async () =>
 });
 
 document.getElementById("btn-class-delete")?.addEventListener("click", async () => {
-  if (!editingClassId) {
+  if (!editingClassId || editingClassId === NEW_CLASS_ID) {
+    return;
+  }
+
+  const classItem = classes.find((item) => item.id === editingClassId);
+  const className = classItem?.name || "этот класс";
+  if (
+    !confirmAction(`Удалить класс «${className}»? Это действие нельзя отменить.`)
+  ) {
     return;
   }
 
@@ -2122,7 +2100,10 @@ chatForm?.addEventListener("submit", async (event) => {
 
 window.classHub.onPeersUpdated(async (list) => {
   if (studentClassGate && !studentClassGate.classList.contains("hidden")) {
-    await renderClassPicker();
+    clearTimeout(classPickerRefreshTimer);
+    classPickerRefreshTimer = setTimeout(() => {
+      renderClassPicker({ quiet: true }).catch(() => {});
+    }, 900);
     return;
   }
 

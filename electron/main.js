@@ -42,7 +42,6 @@ let chatServer = null;
 let captureSourceId = null;
 let isScreenSharing = false;
 let networkDevices = [];
-let screenCaptureTimer = null;
 let serviceHints = new Map();
 let serviceProbeRunning = false;
 let appRole = null;
@@ -188,44 +187,9 @@ function setupScreenCapture() {
   });
 }
 
-function stopScreenCaptureLoop() {
-  if (screenCaptureTimer) {
-    clearInterval(screenCaptureTimer);
-    screenCaptureTimer = null;
-  }
-}
-
-async function captureScreenFrame() {
-  const sources = await desktopCapturer.getSources({
-    types: ["screen"],
-    thumbnailSize: { width: 960, height: 540 },
-  });
-
-  if (!sources.length) {
-    return;
-  }
-
-  const entireScreen = sources.find((source) => /screen|экран|display/i.test(source.name));
-  const source = entireScreen || sources[0];
-  if (!source?.thumbnail || source.thumbnail.isEmpty()) {
-    return;
-  }
-
-  screenServer.setFrame(source.thumbnail.toJPEG(55));
-}
-
-function startScreenCaptureLoop() {
-  stopScreenCaptureLoop();
-  captureScreenFrame().catch(() => {});
-  screenCaptureTimer = setInterval(() => {
-    captureScreenFrame().catch(() => {});
-  }, 250);
-}
-
 async function stopScreenShare() {
   isScreenSharing = false;
   captureSourceId = null;
-  stopScreenCaptureLoop();
 
   if (captureWindow && !captureWindow.isDestroyed()) {
     captureWindow.close();
@@ -517,8 +481,6 @@ const appContext = {
   createCaptureWindow,
   stopScreenShare,
   pickScreenSourceId,
-  startScreenCaptureLoop,
-  stopScreenCaptureLoop,
   getAppVersion: () => app.getVersion(),
 };
 

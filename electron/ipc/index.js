@@ -15,7 +15,6 @@ const { checkForUpdates } = require("../updater");
 const { verifyTeacherPassword } = require("../teacherAuth");
 const { listInstalledApps, getAppIcon, getAppIconsBatch, launchInstalledApp } = require("../installedApps");
 const { fetchTeacherClassConfig } = require("../classConfig");
-const { discoverTeacherClasses } = require("../teacherDiscovery");
 const { readDeviceSession } = require("../deviceSession");
 const {
   readClassesState,
@@ -189,7 +188,6 @@ function registerIpcHandlers(appContext) {
       const result = await appContext.screenServer.start();
       appContext.setCaptureSourceId(captureSourceId);
       appContext.setScreenSharing(true);
-      appContext.stopScreenCaptureLoop();
       appContext.createCaptureWindow();
       appContext.discovery.announceScreen(result.port);
       appContext.refreshServiceHints().catch(() => {});
@@ -225,7 +223,6 @@ function registerIpcHandlers(appContext) {
   });
 
   ipcMain.on("capture-ready", () => {
-    appContext.stopScreenCaptureLoop();
     appContext.sendStatus("Экран передаётся учителю");
   });
 

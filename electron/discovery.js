@@ -1,5 +1,5 @@
 const dgram = require("dgram");
-const { DISCOVERY_SCAN_INTERVAL_MS, SOURCE_ANNOUNCE_INTERVAL_MS } = require("./constants");
+const { DISCOVERY_SCAN_INTERVAL_MS, SOURCE_ANNOUNCE_INTERVAL_MS, PEER_STALE_MS } = require("./constants");
 const { sortPeers } = require("./peers");
 const {
   PORT,
@@ -8,6 +8,7 @@ const {
   MSG_SOURCE,
   MSG_SCREEN,
   MSG_SCREEN_STOP,
+  MSG_STOP_SOURCE,
   getLocalIp,
   getHostname,
   isLocalIp,
@@ -60,6 +61,11 @@ class DiscoveryService {
         return;
       }
 
+      if (type === MSG_STOP_SOURCE) {
+        this.markPeerStoppedSource(rinfo.address);
+        return;
+      }
+
       if (
         (type === MSG_HELLO ||
           type === MSG_SOURCE ||
@@ -77,8 +83,50 @@ class DiscoveryService {
     this.socket.bind(PORT, () => {
       this.upsertPeer(this.getSelfPeer(), MSG_HELLO);
       this.scan();
-      this.scanTimer = setInterval(() => this.scan(), DISCOVERY_SCAN_INTERVAL_MS);
+      this.scanTimer = setInterval(() => {
+        this.scan();
+        this.evictStalePeers();
+      }, DISCOVERY_SCAN_INTERVAL_MS);
     });
+  }
+
+  markPeerStoppedSource(ip) {
+    if (!ip || isLocalIp(ip)) {
+      return;
+    }
+
+    const existing = this.peers.get(ip);
+    if (!existing || existing.isSelf) {
+      return;
+    }
+
+    this.peers.set(ip, {
+      ...existing,
+      isSource: false,
+      httpPort: null,
+      lastSeen: Date.now(),
+    });
+    this.onPeersChanged(this.getPeerList());
+  }
+
+  evictStalePeers() {
+    const now = Date.now();
+    let changed = false;
+
+    for (const [key, peer] of this.peers) {
+      if (peer.isSelf) {
+        continue;
+      }
+
+      if (now - (peer.lastSeen || 0) > PEER_STALE_MS) {
+        this.peers.delete(key);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      this.onPeersChanged(this.getPeerList());
+    }
   }
 
   stop() {
@@ -255,6 +303,8 @@ class DiscoveryService {
         role: peer.role ?? existing.role ?? null,
       };
     }
+
+    peer.lastSeen = Date.now();
 
     if (existing.isSelf) {
       peer = { ...peer, isSelf: true };

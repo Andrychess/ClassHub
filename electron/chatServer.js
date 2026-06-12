@@ -31,6 +31,7 @@ class ChatServer {
       ip: String(message.ip || "").slice(0, 45),
       text: String(message.text || "").trim().slice(0, 2000),
       ts: Number(message.ts) || Date.now(),
+      classId: message.classId ? String(message.classId).slice(0, 64) : null,
     };
 
     if (!normalized.text) {
