@@ -1,6 +1,6 @@
 {
   "name": "classhub",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "ClassHub — локальная сеть учебной группы и раздача материалов",
   "main": "electron/main.js",
   "scripts": {
