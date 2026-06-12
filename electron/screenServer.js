@@ -1,13 +1,14 @@
 const express = require("express");
-const { execFile } = require("child_process");
-const { getLocalIp } = require("./protocol");
+const { SCREEN_SERVER_PORT } = require("./constants");
+const { buildLocalStreamUrl } = require("./urls");
+const { tryAddScreenFirewallRule } = require("./firewall");
+const { listenOn, closeServer } = require("./serverUtils");
 
-const DEFAULT_PORT = 8766;
 const BOUNDARY = "classhub-frame";
 
 class ScreenServer {
   constructor() {
-    this.port = DEFAULT_PORT;
+    this.port = SCREEN_SERVER_PORT;
     this.server = null;
     this.clients = new Set();
     this.latestFrame = null;
@@ -18,7 +19,7 @@ class ScreenServer {
   }
 
   get url() {
-    return `http://${getLocalIp()}:${this.port}/stream`;
+    return buildLocalStreamUrl(this.port);
   }
 
   setFrame(buffer) {
@@ -67,12 +68,9 @@ class ScreenServer {
       });
     });
 
-    await new Promise((resolve, reject) => {
-      this.server = app.listen(this.port, "0.0.0.0", () => resolve());
-      this.server.on("error", reject);
-    });
+    this.server = await listenOn(app, this.port);
+    const firewall = await tryAddScreenFirewallRule(this.port);
 
-    const firewall = await tryAddFirewallRule(this.port);
     return { ok: true, url: this.url, port: this.port, firewall };
   }
 
@@ -86,44 +84,9 @@ class ScreenServer {
     }
     this.clients.clear();
     this.latestFrame = null;
-
-    if (!this.server) {
-      return;
-    }
-
-    await new Promise((resolve) => {
-      this.server.close(() => resolve());
-    });
+    await closeServer(this.server);
     this.server = null;
   }
 }
 
-function tryAddFirewallRule(port) {
-  return new Promise((resolve) => {
-    const ruleName = `ClassHub Screen ${port}`;
-    const args = [
-      "advfirewall",
-      "firewall",
-      "add",
-      "rule",
-      `name=${ruleName}`,
-      "dir=in",
-      "action=allow",
-      "protocol=TCP",
-      `localport=${port}`,
-    ];
-
-    execFile("netsh", args, { windowsHide: true }, (error) => {
-      if (error) {
-        resolve({
-          ok: false,
-          message: "Не удалось открыть порт трансляции в брандмауэре.",
-        });
-        return;
-      }
-      resolve({ ok: true, message: `Порт трансляции ${port} открыт` });
-    });
-  });
-}
-
-module.exports = { ScreenServer, DEFAULT_PORT };
+module.exports = { ScreenServer, SCREEN_SERVER_PORT };

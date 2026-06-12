@@ -1,15 +1,17 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
-const { execFile } = require("child_process");
 const { getLocalIp, getHostname } = require("./protocol");
+const { FILE_SERVER_PORT } = require("./constants");
+const { buildLocalSourceUrl } = require("./urls");
+const { tryAddHttpFirewallRule } = require("./firewall");
+const { listenOn, closeServer } = require("./serverUtils");
 
-const DEFAULT_PORT = 8765;
 const WEB_ROOT = path.join(__dirname, "../src/web");
 
 class FileServer {
   constructor() {
-    this.port = DEFAULT_PORT;
+    this.port = FILE_SERVER_PORT;
     this.directory = null;
     this.server = null;
   }
@@ -19,7 +21,7 @@ class FileServer {
   }
 
   get url() {
-    return `http://${getLocalIp()}:${this.port}/`;
+    return buildLocalSourceUrl(this.port);
   }
 
   async start(directory) {
@@ -101,12 +103,9 @@ class FileServer {
       res.sendFile(path.join(WEB_ROOT, "index.html"));
     });
 
-    await new Promise((resolve, reject) => {
-      this.server = app.listen(this.port, "0.0.0.0", () => resolve());
-      this.server.on("error", reject);
-    });
+    this.server = await listenOn(app, this.port);
+    const firewall = await tryAddHttpFirewallRule(this.port);
 
-    const firewall = await tryAddFirewallRule(this.port);
     return {
       ok: true,
       url: this.url,
@@ -116,13 +115,7 @@ class FileServer {
   }
 
   async stop() {
-    if (!this.server) {
-      return;
-    }
-
-    await new Promise((resolve) => {
-      this.server.close(() => resolve());
-    });
+    await closeServer(this.server);
     this.server = null;
     this.directory = null;
   }
@@ -183,34 +176,4 @@ function buildItem(rootDir, parentPath, entry) {
   };
 }
 
-function tryAddFirewallRule(port) {
-  return new Promise((resolve) => {
-    const ruleName = `ClassHub HTTP ${port}`;
-    const args = [
-      "advfirewall",
-      "firewall",
-      "add",
-      "rule",
-      `name=${ruleName}`,
-      "dir=in",
-      "action=allow",
-      "protocol=TCP",
-      `localport=${port}`,
-    ];
-
-    execFile("netsh", args, { windowsHide: true }, (error) => {
-      if (error) {
-        resolve({
-          ok: false,
-          message:
-            "Не удалось открыть порт в брандмауэре. Запустите приложение от администратора.",
-        });
-        return;
-      }
-
-      resolve({ ok: true, message: `Порт ${port} открыт в брандмауэре` });
-    });
-  });
-}
-
-module.exports = { FileServer, DEFAULT_PORT };
+module.exports = { FileServer, FILE_SERVER_PORT };

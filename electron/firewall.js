@@ -1,6 +1,11 @@
 const { execFile } = require("child_process");
+const {
+  DISCOVERY_PORT,
+  FILE_SERVER_PORT,
+  SCREEN_SERVER_PORT,
+} = require("./constants");
 
-function addFirewallRule({ name, protocol, port }) {
+function tryAddFirewallRule({ name, protocol, port, failureMessage, successMessage }) {
   return new Promise((resolve) => {
     const args = [
       "advfirewall",
@@ -15,15 +20,65 @@ function addFirewallRule({ name, protocol, port }) {
     ];
 
     execFile("netsh", args, { windowsHide: true }, (error) => {
-      resolve({ ok: !error });
+      if (error) {
+        resolve({
+          ok: false,
+          message:
+            failureMessage ||
+            "Не удалось открыть порт в брандмауэре. Запустите приложение от администратора.",
+        });
+        return;
+      }
+
+      resolve({
+        ok: true,
+        message: successMessage || `Порт ${port} открыт в брандмауэре`,
+      });
     });
   });
 }
 
 async function ensureClassHubFirewallRules() {
-  await addFirewallRule({ name: "ClassHub Discovery UDP", protocol: "UDP", port: 49500 });
-  await addFirewallRule({ name: "ClassHub HTTP", protocol: "TCP", port: 8765 });
-  await addFirewallRule({ name: "ClassHub Screen TCP", protocol: "TCP", port: 8766 });
+  await tryAddFirewallRule({
+    name: "ClassHub Discovery UDP",
+    protocol: "UDP",
+    port: DISCOVERY_PORT,
+  });
+  await tryAddFirewallRule({
+    name: "ClassHub HTTP",
+    protocol: "TCP",
+    port: FILE_SERVER_PORT,
+  });
+  await tryAddFirewallRule({
+    name: "ClassHub Screen TCP",
+    protocol: "TCP",
+    port: SCREEN_SERVER_PORT,
+  });
 }
 
-module.exports = { ensureClassHubFirewallRules };
+function tryAddHttpFirewallRule(port = FILE_SERVER_PORT) {
+  return tryAddFirewallRule({
+    name: `ClassHub HTTP ${port}`,
+    protocol: "TCP",
+    port,
+    failureMessage:
+      "Не удалось открыть порт в брандмауэре. Запустите приложение от администратора.",
+    successMessage: `Порт ${port} открыт в брандмауэре`,
+  });
+}
+
+function tryAddScreenFirewallRule(port = SCREEN_SERVER_PORT) {
+  return tryAddFirewallRule({
+    name: `ClassHub Screen ${port}`,
+    protocol: "TCP",
+    port,
+    failureMessage: "Не удалось открыть порт трансляции в брандмауэре.",
+    successMessage: `Порт трансляции ${port} открыт`,
+  });
+}
+
+module.exports = {
+  ensureClassHubFirewallRules,
+  tryAddHttpFirewallRule,
+  tryAddScreenFirewallRule,
+};

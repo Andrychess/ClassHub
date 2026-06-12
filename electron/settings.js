@@ -1,8 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { app } = require("electron");
-
-const MAX_FOLDERS = 20;
+const { MAX_SAVED_FOLDERS } = require("./constants");
 
 function getSettingsPath() {
   return path.join(app.getPath("userData"), "folders.json");
@@ -53,6 +52,35 @@ function pruneMissingFolders(folders) {
   return folders.filter((folder) => folderExists(folder));
 }
 
+function normalizeFolderState(settings) {
+  const savedFolders = pruneMissingFolders(settings.savedFolders);
+  let lastSelectedFolder = settings.lastSelectedFolder;
+
+  if (lastSelectedFolder && !folderExists(lastSelectedFolder)) {
+    lastSelectedFolder = savedFolders[0] || null;
+  }
+
+  return { savedFolders, lastSelectedFolder };
+}
+
+function readFolderState() {
+  return normalizeFolderState(loadSettings());
+}
+
+function syncFolderState() {
+  const stored = loadSettings();
+  const normalized = normalizeFolderState(stored);
+
+  if (
+    JSON.stringify(normalized.savedFolders) !== JSON.stringify(stored.savedFolders) ||
+    normalized.lastSelectedFolder !== stored.lastSelectedFolder
+  ) {
+    saveSettings(normalized);
+  }
+
+  return normalized;
+}
+
 function addSavedFolder(folderPath) {
   const normalized = normalizeFolder(folderPath);
   if (!folderExists(normalized)) {
@@ -61,7 +89,7 @@ function addSavedFolder(folderPath) {
 
   const settings = loadSettings();
   const others = settings.savedFolders.filter((folder) => folder !== normalized);
-  settings.savedFolders = [normalized, ...others].slice(0, MAX_FOLDERS);
+  settings.savedFolders = [normalized, ...others].slice(0, MAX_SAVED_FOLDERS);
   settings.lastSelectedFolder = normalized;
   saveSettings(settings);
   return settings;
@@ -88,20 +116,16 @@ function setSelectedFolder(folderPath) {
   return { ok: true, settings };
 }
 
-function getFolderState() {
-  const settings = loadSettings();
-  settings.savedFolders = pruneMissingFolders(settings.savedFolders);
-  if (settings.lastSelectedFolder && !folderExists(settings.lastSelectedFolder)) {
-    settings.lastSelectedFolder = settings.savedFolders[0] || null;
-  }
-  saveSettings(settings);
-  return settings;
+function getSelectedFolder() {
+  return readFolderState().lastSelectedFolder;
 }
 
 module.exports = {
   addSavedFolder,
   removeSavedFolder,
   setSelectedFolder,
-  getFolderState,
+  readFolderState,
+  syncFolderState,
+  getSelectedFolder,
   folderExists,
 };

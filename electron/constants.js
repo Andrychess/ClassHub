@@ -1,0 +1,23 @@
+module.exports = {
+  DISCOVERY_PORT: 49500,
+  FILE_SERVER_PORT: 8765,
+  SCREEN_SERVER_PORT: 8766,
+  DISCOVERY_SCAN_INTERVAL_MS: 5000,
+  NETWORK_SCAN_DELAY_MS: 1500,
+  PING_TIMEOUT_MS: 350,
+  SUBNET_BATCH_SIZE: 32,
+  SUBNET_HOST_START: 1,
+  SUBNET_HOST_END: 254,
+  MAX_SAVED_FOLDERS: 20,
+  MAIN_WINDOW: {
+    width: 1040,
+    height: 820,
+    minWidth: 760,
+    minHeight: 620,
+  },
+  CAPTURE_WINDOW: {
+    width: 320,
+    height: 240,
+  },
+  APP_BACKGROUND: "#0f1117",
+};
