@@ -81,6 +81,17 @@ if (-not $release) {
 }
 
 $fileName = Split-Path $ExePath -Leaf
+
+foreach ($asset in @($release.assets)) {
+  if ($asset.name -eq $fileName) {
+    Write-Host "Replacing existing asset: $fileName" -ForegroundColor Yellow
+    Invoke-RestMethod `
+      -Method Delete `
+      -Uri $asset.url `
+      -Headers $headers | Out-Null
+  }
+}
+
 $uploadUrl = "https://uploads.github.com/repos/$owner/$repo/releases/$($release.id)/assets?name=$([uri]::EscapeDataString($fileName))"
 
 Write-Host "Uploading $fileName..." -ForegroundColor Cyan

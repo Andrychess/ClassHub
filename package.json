@@ -1,6 +1,6 @@
 {
   "name": "classhub",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "ClassHub — локальная сеть учебной группы и раздача материалов",
   "main": "electron/main.js",
   "scripts": {
@@ -10,10 +10,14 @@
     "predist": "powershell -ExecutionPolicy Bypass -File ./scripts/pre-dist.ps1",
     "dist": "node ./scripts/run-dist.js",
     "dist:publish": "node ./scripts/run-dist.js -- --win --publish always",
+    "bump": "node ./scripts/bump-version.js patch",
+    "bump:patch": "node ./scripts/bump-version.js patch",
+    "bump:minor": "node ./scripts/bump-version.js minor",
+    "bump:major": "node ./scripts/bump-version.js major",
     "upload:github": "powershell -ExecutionPolicy Bypass -File ./scripts/upload-release.ps1",
-    "release:patch": "npm version patch -m \"Release %s\"",
-    "release:minor": "npm version minor -m \"Release %s\"",
-    "release:major": "npm version major -m \"Release %s\""
+    "release": "powershell -ExecutionPolicy Bypass -File ./scripts/release.ps1",
+    "release:minor": "powershell -ExecutionPolicy Bypass -File ./scripts/release.ps1 -Bump minor",
+    "release:major": "powershell -ExecutionPolicy Bypass -File ./scripts/release.ps1 -Bump major"
   },
   "author": "ClassHub",
   "license": "MIT",
